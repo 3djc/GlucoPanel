@@ -93,6 +93,11 @@ bool wifiConnect(EPaper& epaper) {
     epaper.drawString("WiFi connected", 20, 20, 4);
     epaper.drawString("SSID: " + WiFi.SSID(), 20, 70, 2);
     epaper.drawString("IP: " + WiFi.localIP().toString(), 20, 100, 2);
+    String url = "http://" + WiFi.localIP().toString();
+    epaper.drawString("Configure the panel at:", 20, 170, 2);
+    epaper.drawString(url, 20, 200, 2);
+    epaper.drawString("or http://glucopanel.local", 20, 230, 2);
+    drawQR(520, 80, 7, url.c_str());
   } else {
     epaper.drawString("WiFi setup failed", 20, 20, 4);
   }

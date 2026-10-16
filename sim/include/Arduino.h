@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -16,6 +17,12 @@ class String : public std::string {
   String(float v) : std::string(std::to_string(v)) {}
   const char* c_str() const { return std::string::c_str(); }
   int length() const { return (int)size(); }
+  bool startsWith(const char* p) const { return rfind(p, 0) == 0; }
+  bool endsWith(const char* p) const {
+    size_t n = strlen(p);
+    return size() >= n && compare(size() - n, n, p) == 0;
+  }
+  void remove(unsigned idx) { erase(idx); }
 };
 
 struct SerialShim {
@@ -26,6 +33,11 @@ struct SerialShim {
   template <typename... A> void printf(const char* f, A... a) { ::printf(f, a...); }
 };
 extern SerialShim Serial;
+
+struct EspShim {
+  void restart() { puts("ESP.restart() -> exiting sim"); exit(0); }
+};
+static EspShim ESP;
 
 #define INPUT 0
 #define INPUT_PULLUP 2

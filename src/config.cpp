@@ -1,0 +1,45 @@
+#include "config.h"
+#include <Preferences.h>
+
+const ConfigField CONFIG_FIELDS[] = {
+  {"source", "Data source", "select", "", "nightscout:Nightscout|libre:LibreLinkUp|dexcom:Dexcom Share", "nightscout"},
+
+  {"ns_url", "Nightscout URL", "url", "nightscout", "", ""},
+  {"ns_token", "Access token (optional)", "password", "nightscout", "", ""},
+
+  {"libre_email", "Email", "text", "libre", "", ""},
+  {"libre_pass", "Password", "password", "libre", "", ""},
+  {"libre_region", "Region", "select", "libre",
+   "eu:Europe|eu2:Europe 2|us:United States|de:Germany|fr:France|jp:Japan|ap:Asia-Pacific|au:Australia|ae:UAE|ca:Canada", "eu"},
+
+  {"dex_user", "Username", "text", "dexcom", "", ""},
+  {"dex_pass", "Password", "password", "dexcom", "", ""},
+  {"dex_region", "Server", "select", "dexcom", "us:United States|ous:Outside US|jp:Japan", "us"},
+
+  {"unit", "Display unit", "select", "", "mgdl:mg/dL|mmol:mmol/L", "mgdl"},
+  {"low", "Low threshold (mg/dL)", "number", "", "", "70"},
+  {"high", "High threshold (mg/dL)", "number", "", "", "180"},
+};
+const int CONFIG_FIELD_COUNT = sizeof(CONFIG_FIELDS) / sizeof(CONFIG_FIELDS[0]);
+
+static const char* NS = "gluco";
+
+String cfgGet(const char* key) {
+  String def;
+  for (int i = 0; i < CONFIG_FIELD_COUNT; i++)
+    if (!strcmp(CONFIG_FIELDS[i].key, key)) def = CONFIG_FIELDS[i].def;
+  Preferences prefs;
+  prefs.begin(NS, false);
+  String v = prefs.getString(key, def);
+  prefs.end();
+  return v;
+}
+
+void cfgSet(const char* key, const String& value) {
+  Preferences prefs;
+  prefs.begin(NS, false);
+  prefs.putString(key, value);
+  prefs.end();
+}
+
+int refreshMinutes() { return cfgGet("source") == "dexcom" ? 5 : 1; }
