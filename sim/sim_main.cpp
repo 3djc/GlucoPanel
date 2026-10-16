@@ -127,17 +127,83 @@ void EPaper::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16
     }
 }
 
-int EPaper::drawString(const String& s, int x, int y, int font) {
-  static const int scaleFor[] = {1, 1, 2, 2, 3, 3, 5, 6, 8};  // by TFT_eSPI font number
-  int scale = (font >= 0 && font <= 8 ? scaleFor[font] : 1) * size_;
+// ---- Seeed_GFX fonts (data copied from the library, decoded as TFT_eSPI::drawChar does) ----
+#include "fonts/Font16.c"
+#include "fonts/Font32rle.c"
+#include "fonts/Font64rle.c"
+#include "fonts/Font72rle.c"
+#include "fonts/Font7srle.c"
+
+struct FontInfo {
+  const unsigned char* widths;
+  const unsigned char* const* chars;
+  int height;
+  bool rle;  // font 2 is plain row bitmaps, the others are run-length encoded
+};
+
+static const FontInfo* fontInfo(int font) {
+  static const FontInfo f2 = {widtbl_f16, chrtbl_f16, 16, false};
+  static const FontInfo f4 = {widtbl_f32, chrtbl_f32, 26, true};
+  static const FontInfo f6 = {widtbl_f64, chrtbl_f64, 48, true};
+  static const FontInfo f7 = {widtbl_f7s, chrtbl_f7s, 48, true};
+  static const FontInfo f8 = {widtbl_f72, chrtbl_f72, 75, true};
+  switch (font) {
+    case 2: return &f2;
+    case 4: return &f4;
+    case 6: return &f6;
+    case 7: return &f7;
+    case 8: return &f8;
+    default: return nullptr;  // font 1 (GLCD 5x7) and unused numbers
+  }
+}
+
+int EPaper::textWidth(const String& str, int font) {
+  const FontInfo* fi = fontInfo(font);
+  int w = 0;
+  for (unsigned char c : str) w += fi ? fi->widths[(c > 31 && c < 128 ? c : 32) - 32] : 6;
+  return w * size_;
+}
+
+int EPaper::fontHeight(int font) {
+  const FontInfo* fi = fontInfo(font);
+  return (fi ? fi->height : 8) * size_;
+}
+
+int EPaper::drawString(const String& str, int x, int y, int font) {
+  const FontInfo* fi = fontInfo(font);
   int cx = x;
-  for (unsigned char ch : s) {
-    for (int col = 0; col < 5; col++) {
-      uint8_t bits = font_[ch * 5 + col];
-      for (int row = 0; row < 7; row++)
-        if (bits & (1 << row)) fillRect(cx + col * scale, y + row * scale, scale, scale, fg_);
+  for (unsigned char ch : str) {
+    if (!fi) {  // font 1: 5x7 glyphs in a 6x8 cell
+      for (int col = 0; col < 5; col++) {
+        uint8_t bits = font_[ch * 5 + col];
+        for (int row = 0; row < 7; row++)
+          if (bits & (1 << row)) fillRect(cx + col * size_, y + row * size_, size_, size_, fg_);
+      }
+      cx += 6 * size_;
+      continue;
     }
-    cx += 6 * scale;
+    if (ch < 32 || ch > 127) continue;
+    int width = fi->widths[ch - 32], height = fi->height;
+    const unsigned char* d = fi->chars[ch - 32];
+    if (!fi->rle) {
+      int bytesPerRow = (width + 6) / 8;
+      for (int r = 0; r < height; r++)
+        for (int k = 0; k < bytesPerRow; k++)
+          for (int b = 0; b < 8; b++)
+            if (d[bytesPerRow * r + k] & (0x80 >> b))
+              fillRect(cx + (k * 8 + b) * size_, y + r * size_, size_, size_, fg_);
+    } else {
+      int total = width * height, pc = 0;
+      while (pc < total) {
+        unsigned char b = *d++;
+        int run = (b & 0x7F) + 1;
+        if (b & 0x80)
+          for (int j = 0; j < run; j++)
+            fillRect(cx + ((pc + j) % width) * size_, y + ((pc + j) / width) * size_, size_, size_, fg_);
+        pc += run;
+      }
+    }
+    cx += width * size_;
   }
   return cx - x;
 }

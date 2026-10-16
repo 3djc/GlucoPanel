@@ -89,7 +89,7 @@ Other variables:
 | `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
 | `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
 
-Limitations: text uses a scaled 5×7 font, so it looks different from the real fonts; ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
+Text uses the same font data and metrics as the device (Seeed_GFX fonts 1, 2, 4, 6, 7 and 8, copied into `sim/fonts/`); the FreeFonts are not supported. Limitations: ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
 
 ## Layout
 
@@ -107,6 +107,7 @@ src/
 sim/
   sim_main.cpp      SDL2 host and drawing
   http_sim.cpp      HTTP client (libcurl)
+  fonts/            Seeed_GFX font data used by the sim text renderer
   include/          Arduino, WiFi, WebServer, Preferences... stand-ins
 tools/
   mock_cgm.py       mock CGM services for the simulator

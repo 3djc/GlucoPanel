@@ -63,17 +63,18 @@ void drawDashboard(EPaper& e, const Reading& last, const String& error, bool not
     char buf[16];
     if (mmol) snprintf(buf, sizeof(buf), "%.1f", last.mgdl / 18.016);
     else snprintf(buf, sizeof(buf), "%d", last.mgdl);
-    e.setTextSize(6);
-    e.drawString(buf, 40, 90, 4);
+    e.setTextSize(2);
+    e.drawString(buf, 40, 55, 8);  // font 8: 75 px digits, doubled
+    int numberWidth = e.textWidth(buf, 8);
     e.setTextSize(1);
-    drawArrow(e, 600, 220, 150, last.trend);
+    drawArrow(e, 40 + numberWidth + 110, 130, 130, last.trend);
 
     int low = atoi(cfgGet("low").c_str()), high = atoi(cfgGet("high").c_str());
     const char* status = last.mgdl < low ? "LOW" : last.mgdl > high ? "HIGH" : "IN RANGE";
     e.setTextSize(2);
-    e.drawString(status, 40, 290, 4);
+    e.drawString(status, 40, 250, 4);
     e.setTextSize(1);
-    e.drawString("Updated " + ageText(last.when), 40, 380, 4);
+    e.drawString("Updated " + ageText(last.when), 40, 350, 4);
   }
 
   if (error.length() && !notConfigured) {

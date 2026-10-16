@@ -32,8 +32,10 @@ class EPaper {
 
   void setTextColor(uint16_t c) { fg_ = c; }
   void setTextSize(int s) { size_ = s < 1 ? 1 : s; }
-  // font is a TFT_eSPI font number; approximated by scaling a 5x7 font.
+  // Same glyph data and metrics as Seeed_GFX fonts 1, 2, 4, 6, 7 and 8 (top-left datum).
   int drawString(const String& s, int x, int y, int font = 1);
+  int textWidth(const String& s, int font = 1);
+  int fontHeight(int font = 1);
 
  private:
   uint8_t fb_[SIM_W * SIM_H];
