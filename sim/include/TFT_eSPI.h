@@ -14,7 +14,8 @@
 class EPaper {
  public:
   void begin();
-  void update();  // present framebuffer in the SDL window
+  void update();  // full refresh: present framebuffer in the SDL window
+  void updataPartial(uint16_t x, uint16_t y, uint16_t w, uint16_t h);  // partial refresh of a window
   void sleep() {}
   int width() const { return SIM_W; }
   int height() const { return SIM_H; }
@@ -38,6 +39,7 @@ class EPaper {
   int fontHeight(int font = 1);
 
  private:
+  void present();
   uint8_t fb_[SIM_W * SIM_H];
   uint16_t fg_ = TFT_BLACK;
   int size_ = 1;

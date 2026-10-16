@@ -56,6 +56,7 @@ void loop() {
     bool changed = configServerTakeChanged();
     if (changed) lastGood = Reading();  // new source/credentials: drop the old reading
     if (changed || millis() >= nextFetch) refresh();
+    dashboardTick(epaper);
   }
   delay(2);
 }

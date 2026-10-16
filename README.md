@@ -30,6 +30,16 @@ Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Pa
 
 **Security:** the page has no login and secrets are stored unencrypted. Only use it on a network you trust.
 
+## ePaper refresh policy
+
+Full refreshes flash and wear the panel, so `src/display.cpp` avoids them:
+
+- **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and every 30 minutes to clear ghosting (`FULL_REFRESH_MS`).
+- **Partial refresh** of just the changed window for everything else: the number block when a fetch brings a new value or trend, the "Updated N min ago" line once a minute, and the error footer.
+- **No refresh** when a fetch changes nothing, e.g. repeated identical errors.
+
+The sim logs every refresh (`epaper: FULL refresh` / `partial refresh`) so you can check this.
+
 ## Data sources
 
 | Source | How it is read |
@@ -77,7 +87,7 @@ python3 tools/mock_cgm.py                                   # terminal 1
 SIM_API_BASE=http://localhost:9000 pio run -e sim -t exec   # terminal 2
 ```
 
-Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
+Set `MOCK_FREEZE=1` on the mock to keep one measurement time so the reading's age keeps growing. Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
 
 Other variables:
 

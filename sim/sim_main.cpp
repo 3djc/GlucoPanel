@@ -62,6 +62,18 @@ void EPaper::begin() {
 }
 
 void EPaper::update() {
+  static int fullCount = 0;
+  printf("epaper: FULL refresh #%d\n", ++fullCount);
+  present();
+}
+
+void EPaper::updataPartial(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+  static int partialCount = 0;
+  printf("epaper: partial refresh #%d (%d,%d %dx%d)\n", ++partialCount, x, y, w, h);
+  present();
+}
+
+void EPaper::present() {
   static uint8_t rgb[SIM_W * SIM_H * 3];
   for (int i = 0; i < SIM_W * SIM_H; i++) {
     uint8_t g = 255 - fb_[i] * 17;  // 0 -> white, 15 -> black

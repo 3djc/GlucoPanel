@@ -6,3 +6,6 @@
 // last fetch error. When nothing is configured it shows the settings page address instead.
 void drawDashboard(EPaper& e, const Reading& last, const String& error, bool notConfigured,
                    const String& configUrl);
+
+// Call from loop(): once a minute, refreshes only the "Updated N min ago" line (partial refresh).
+void dashboardTick(EPaper& e);

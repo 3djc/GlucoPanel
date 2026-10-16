@@ -7,7 +7,7 @@
 Credentials: Dexcom user/pass, LibreLinkUp a@b.c/pass ("redirect@test" exercises the region
 redirect), Nightscout token "tok" (or none). Glucose follows a slow wave with a changing trend.
 """
-import hashlib, json, math, sys, time
+import hashlib, json, math, os, sys, time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -17,13 +17,16 @@ TOKEN = "libre-token-123"
 SESSION = "dex-session-1"
 TRENDS = ["DoubleDown", "SingleDown", "FortyFiveDown", "Flat", "FortyFiveUp", "SingleUp", "DoubleUp"]
 
+START = time.time()
+
 def reading():
     t = time.time()
     phase = t / 90.0
     mgdl = round(130 + 70 * math.sin(phase))
     slope = math.cos(phase)  # -1..1
     idx = min(6, max(0, round((slope + 1) / 2 * 6)))
-    return mgdl, idx, t - 120  # measured two minutes ago
+    # measured two minutes ago; MOCK_FREEZE=1 keeps one measurement time so its age keeps growing
+    return mgdl, idx, (START - 100 if os.environ.get("MOCK_FREEZE") else t - 120)
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
