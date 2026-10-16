@@ -26,6 +26,7 @@ class EPaper {
   void drawFastVLine(int x, int y, int h, uint16_t c) { fillRect(x, y, 1, h, c); }
   void drawRect(int x, int y, int w, int h, uint16_t c);
   void fillRect(int x, int y, int w, int h, uint16_t c);
+  void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t c);
   void drawCircle(int cx, int cy, int r, uint16_t c);
   void fillCircle(int cx, int cy, int r, uint16_t c);
 

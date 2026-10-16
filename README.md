@@ -2,7 +2,7 @@
 
 Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800×480 monochrome ePaper, no touch), built with PlatformIO and the Arduino framework. It includes an SDL2 simulator so you can develop without the device.
 
-> **Status:** WiFi onboarding, the settings web page and the simulator work. Fetching and drawing glucose data is not implemented yet; the settings are stored but nothing reads them.
+> **Status:** WiFi onboarding, the settings page, glucose fetching (Nightscout, LibreLinkUp, Dexcom Share), the dashboard and the simulator are implemented. The fetchers are tested against a mock server only; they have not been run against the real services or on the device.
 
 ## How it works
 
@@ -24,11 +24,23 @@ Open the address shown on the display from any device on the same network.
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
-The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
+The panel then shows the latest reading, trend arrow, LOW / IN RANGE / HIGH and its age, and refetches on a timer. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
 Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
 **Security:** the page has no login and secrets are stored unencrypted. Only use it on a network you trust.
+
+## Data sources
+
+| Source | How it is read |
+| --- | --- |
+| Nightscout | `GET <url>/api/v1/entries/sgv.json?count=1`, optional `&token=` (an access token; the raw API secret is not supported) |
+| LibreLinkUp | `POST /llu/auth/login` (follows region redirects), then `GET /llu/connections` with `Authorization` and the SHA-256 `account-id` header; uses the first connection |
+| Dexcom Share | `AuthenticatePublisherAccount`, `LoginPublisherAccountById`, then `ReadPublisherLatestGlucoseValues`; uses a username (not a phone/email login) |
+
+LibreLinkUp and Dexcom Share are unofficial APIs and can change without notice. Sessions are cached and renewed on expiry. The clock is set over NTP because reading ages need it.
+
+**Security:** HTTPS is used but the device does **not verify server certificates** (no CA bundle is embedded), so a hostile network could intercept your credentials. Pinning or bundling CA certificates would fix this.
 
 ## Build and flash
 
@@ -58,16 +70,26 @@ pio run -e sim -t exec
 - `SIM_WIFI=fail` simulates saved WiFi that can't be joined.
 - Settings are saved in `.sim_prefs` (git-ignored).
 
+To exercise the data sources without real accounts, run the mock server and point the sim at it:
+
+```sh
+python3 tools/mock_cgm.py                                   # terminal 1
+SIM_API_BASE=http://localhost:9000 pio run -e sim -t exec   # terminal 2
+```
+
+Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
+
 Other variables:
 
 | Variable | Effect |
 | --- | --- |
+| `SIM_API_BASE=<url>` | Send every HTTP request to this base URL (see above) |
 | `SIM_NOWAIT=1` | Skip waiting for Enter on the setup screen |
 | `SIM_PRESS=<pin>` | Hold that button pin pressed (3 or 4) |
 | `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
 | `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
 
-Limitations: text uses a scaled 5×7 font, so it looks different from the real fonts; ePaper refresh time and ghosting are not modelled; WiFi, HTTP clients and touch are not simulated.
+Limitations: text uses a scaled 5×7 font, so it looks different from the real fonts; ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
 
 ## Layout
 
@@ -79,9 +101,15 @@ src/
   wifi_setup.*      saved-WiFi join, erase prompt, hotspot + QR codes
   config.*          settings table and NVS storage
   config_server.*   settings web page
+  glucose.*         Nightscout / LibreLinkUp / Dexcom fetchers
+  display.*         dashboard screen
+  http.*            HTTP(S) client (device)
 sim/
   sim_main.cpp      SDL2 host and drawing
+  http_sim.cpp      HTTP client (libcurl)
   include/          Arduino, WiFi, WebServer, Preferences... stand-ins
+tools/
+  mock_cgm.py       mock CGM services for the simulator
 ```
 
 ## Notes

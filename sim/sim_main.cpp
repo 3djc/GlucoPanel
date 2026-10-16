@@ -116,6 +116,17 @@ void EPaper::fillCircle(int cx, int cy, int r, uint16_t c) {
       if (i * i + j * j <= r * r) drawPixel(cx + i, cy + j, c);
 }
 
+void EPaper::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t c) {
+  int minx = std::min({x0, x1, x2}), maxx = std::max({x0, x1, x2});
+  int miny = std::min({y0, y1, y2}), maxy = std::max({y0, y1, y2});
+  auto edge = [](int ax, int ay, int bx, int by, int px, int py) { return (bx - ax) * (py - ay) - (by - ay) * (px - ax); };
+  for (int y = miny; y <= maxy; y++)
+    for (int x = minx; x <= maxx; x++) {
+      int a = edge(x0, y0, x1, y1, x, y), b = edge(x1, y1, x2, y2, x, y), d = edge(x2, y2, x0, y0, x, y);
+      if ((a >= 0 && b >= 0 && d >= 0) || (a <= 0 && b <= 0 && d <= 0)) drawPixel(x, y, c);
+    }
+}
+
 int EPaper::drawString(const String& s, int x, int y, int font) {
   static const int scaleFor[] = {1, 1, 2, 2, 3, 3, 5, 6, 8};  // by TFT_eSPI font number
   int scale = (font >= 0 && font <= 8 ? scaleFor[font] : 1) * size_;
@@ -132,6 +143,7 @@ int EPaper::drawString(const String& s, int x, int y, int font) {
 }
 
 int main() {
+  setvbuf(stdout, nullptr, _IOLBF, 0);  // line-buffered so logs show up when redirected
   setup();
   long frames = getenv("SIM_FRAMES") ? atol(getenv("SIM_FRAMES")) : -1;
   while (!quit_requested && frames != 0) {

@@ -9,6 +9,7 @@
 #include "config.h"
 
 static WebServer server(80);
+static bool settingsChanged = false;
 
 static String esc(const String& s) {
   String o;
@@ -92,6 +93,7 @@ static void handleSave() {
   String vals[CONFIG_FIELD_COUNT];
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) {
     const ConfigField& f = CONFIG_FIELDS[i];
+    if (!server.hasArg(f.key)) { vals[i] = cfgGet(f.key); continue; }  // field not submitted: keep it
     String v = server.arg(f.key);
     String t;  // trim, and drop control characters
     for (int k = 0; k < v.length(); k++)
@@ -125,6 +127,7 @@ static void handleSave() {
   if (low >= high) return fail("Low threshold must be below the high threshold");
 
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) cfgSet(CONFIG_FIELDS[i].key, vals[i]);
+  settingsChanged = true;
   server.sendHeader("Location", "/?saved=1");
   server.send(303, "text/plain", "");
 }
@@ -149,3 +152,9 @@ void configServerBegin() {
 }
 
 void configServerHandle() { server.handleClient(); }
+
+bool configServerTakeChanged() {
+  bool c = settingsChanged;
+  settingsChanged = false;
+  return c;
+}

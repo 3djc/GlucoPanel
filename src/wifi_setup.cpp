@@ -44,16 +44,16 @@ static bool askEraseCredentials(const String& ssid) {
   return false;
 }
 
-static void drawQR(int x, int y, int scale, const char* text) {
+void drawQR(EPaper& epaper, int x, int y, int scale, const char* text) {
   QRCode qr;
   uint8_t buf[qrcode_getBufferSize(4)];
   qrcode_initText(&qr, buf, 4, ECC_MEDIUM, text);
   int quiet = 2 * scale;
-  gEpaper->fillRect(x - quiet, y - quiet, qr.size * scale + 2 * quiet, qr.size * scale + 2 * quiet, TFT_WHITE);
+  epaper.fillRect(x - quiet, y - quiet, qr.size * scale + 2 * quiet, qr.size * scale + 2 * quiet, TFT_WHITE);
   for (int j = 0; j < qr.size; j++)
     for (int i = 0; i < qr.size; i++)
       if (qrcode_getModule(&qr, i, j))
-        gEpaper->fillRect(x + i * scale, y + j * scale, scale, scale, TFT_BLACK);
+        epaper.fillRect(x + i * scale, y + j * scale, scale, scale, TFT_BLACK);
 }
 
 static void showPortalScreen(WiFiManager*) {
@@ -62,9 +62,9 @@ static void showPortalScreen(WiFiManager*) {
   e.setTextColor(TFT_BLACK);
   e.drawString("WiFi setup", 20, 20, 4);
   e.drawString("1. Join WiFi " AP_NAME, 20, 70, 2);
-  drawQR(80, 130, 7, "WIFI:T:nopass;S:" AP_NAME ";;");
+  drawQR(*gEpaper, 80, 130, 7, "WIFI:T:nopass;S:" AP_NAME ";;");
   e.drawString("2. Open setup page", 420, 70, 2);
-  drawQR(480, 130, 7, "http://192.168.4.1");
+  drawQR(*gEpaper, 480, 130, 7, "http://192.168.4.1");
   e.drawString("(or browse to 192.168.4.1)", 420, 400, 2);
   e.update();
 }
@@ -97,7 +97,7 @@ bool wifiConnect(EPaper& epaper) {
     epaper.drawString("Configure the panel at:", 20, 170, 2);
     epaper.drawString(url, 20, 200, 2);
     epaper.drawString("or http://glucopanel.local", 20, 230, 2);
-    drawQR(520, 80, 7, url.c_str());
+    drawQR(epaper, 520, 80, 7, url.c_str());
   } else {
     epaper.drawString("WiFi setup failed", 20, 20, 4);
   }
