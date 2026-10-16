@@ -21,6 +21,14 @@ struct FetchResult {
   String error;
 };
 
+// Changes in mg/dL of the latest reading vs the previous one and vs ~15 min earlier,
+// computed from the readings collected by recent fetches (cleared when the source changes).
+struct Deltas {
+  bool has1 = false, has15 = false;
+  int d1 = 0, d15 = 0;
+};
+Deltas glucoseDeltas(const Reading& latest);
+
 void glucoseInit();       // starts NTP (timestamps need a correct clock)
 FetchResult fetchGlucose();  // fetches from the data source chosen in the settings page
 const char* sourceName();    // display name of the configured source

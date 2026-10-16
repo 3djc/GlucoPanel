@@ -123,12 +123,56 @@ static Trend trendFromLibreArrow(int n) {  // 1 = SingleDown ... 5 = SingleUp
   return n >= 1 && n <= 5 ? t[n] : TREND_UNKNOWN;
 }
 
+// ---------- reading history (for the deltas) ----------
+
+static const int HIST_MAX = 96;
+static Reading hist[HIST_MAX];  // ascending by time
+static int histN = 0;
+
+static void historyClear() { histN = 0; }
+
+static void historyAdd(int mgdl, time_t when, Trend trend) {
+  if (mgdl <= 0 || when <= 0) return;
+  for (int i = 0; i < histN; i++)
+    if (hist[i].when == when) return;  // already known
+  if (histN == HIST_MAX) {             // full: drop the oldest
+    for (int i = 1; i < histN; i++) hist[i - 1] = hist[i];
+    histN--;
+  }
+  int i = histN++;
+  while (i > 0 && hist[i - 1].when > when) { hist[i] = hist[i - 1]; i--; }
+  hist[i].valid = true;
+  hist[i].mgdl = mgdl;
+  hist[i].trend = trend;
+  hist[i].when = when;
+}
+
+Deltas glucoseDeltas(const Reading& latest) {
+  Deltas d;
+  if (!latest.valid) return d;
+  const time_t TOLERANCE = 450;  // 7.5 min: graph points can be 15 min apart
+  time_t target = latest.when - 15 * 60;
+  const Reading* prev = nullptr;
+  const Reading* ago = nullptr;
+  for (int i = 0; i < histN; i++) {
+    const Reading& h = hist[i];
+    if (h.when >= latest.when) continue;
+    if (latest.when - h.when < 120) continue;  // Dexcom often returns the same measurement twice, seconds apart
+    prev = &h;  // ascending, so the last one older than that wins
+    time_t diff = h.when > target ? h.when - target : target - h.when;
+    if (diff <= TOLERANCE && (!ago || diff < (ago->when > target ? ago->when - target : target - ago->when))) ago = &h;
+  }
+  if (prev && latest.when - prev->when <= 30 * 60) { d.has1 = true; d.d1 = latest.mgdl - prev->mgdl; }
+  if (ago) { d.has15 = true; d.d15 = latest.mgdl - ago->mgdl; }
+  return d;
+}
+
 // ---------- Nightscout ----------
 
 static FetchResult fetchNightscout() {
   String base = cfgGet("ns_url");
   if (!base.length()) { FetchResult r; r.notConfigured = true; r.error = "Nightscout URL not set"; return r; }
-  String url = base + "/api/v1/entries/sgv.json?count=1";
+  String url = base + "/api/v1/entries/sgv.json?count=30";  // ~15+ min of history for the deltas
   String tok = cfgGet("ns_token");
   if (tok.length()) url += "&token=" + urlEncode(tok);
 
@@ -137,15 +181,26 @@ static FetchResult fetchNightscout() {
   if (r.status == 401 || r.status == 403) return fail("Nightscout: access denied (check token)");
   if (r.status != 200) return fail("Nightscout: HTTP " + String(r.status));
 
+  JsonDocument filter;
+  filter[0]["sgv"] = true;
+  filter[0]["date"] = true;
+  filter[0]["direction"] = true;
   JsonDocument doc;
-  if (deserializeJson(doc, r.body.c_str())) return fail("Nightscout: unreadable response");
+  if (deserializeJson(doc, r.body.c_str(), DeserializationOption::Filter(filter))) return fail("Nightscout: unreadable response");
   JsonArray a = doc.as<JsonArray>();
   if (a.isNull() || a.size() == 0) return fail("Nightscout: no readings");
-  JsonObject o = a[0];
-  int sgv = (int)lround(o["sgv"] | 0.0);
-  if (sgv <= 0) return fail("Nightscout: reading has no value");
-  double ms = o["date"] | 0.0;
-  return succeed(sgv, trendFromName(o["direction"] | ""), (time_t)(ms / 1000.0));
+
+  Reading newest;
+  for (JsonObject o : a) {
+    int sgv = (int)lround(o["sgv"] | 0.0);
+    time_t when = (time_t)((o["date"] | 0.0) / 1000.0);
+    Trend t = trendFromName(o["direction"] | "");
+    if (sgv <= 0 || when <= 0) continue;
+    historyAdd(sgv, when, t);
+    if (when > newest.when) { newest.valid = true; newest.mgdl = sgv; newest.when = when; newest.trend = t; }
+  }
+  if (!newest.valid) return fail("Nightscout: reading has no value");
+  return succeed(newest.mgdl, newest.trend, newest.when);
 }
 
 // ---------- Dexcom Share ----------
@@ -204,7 +259,7 @@ static FetchResult fetchDexcom() {
     String error;
     if (!dexSession.length() && !dexLogin(error)) return fail(error);
     HttpResponse r = httpRequest("POST",
-        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=1440&maxCount=1",
+        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=30&maxCount=8",
         "", {{"Content-Type", "application/json"}, {"Accept", "application/json"}});
     if (r.status <= 0) return fail("Dexcom: " + r.error);
     String code = dexErrorCode(r.body);
@@ -214,22 +269,37 @@ static FetchResult fetchDexcom() {
     JsonDocument doc;
     if (deserializeJson(doc, r.body.c_str())) return fail("Dexcom: unreadable response");
     JsonArray a = doc.as<JsonArray>();
-    if (a.isNull() || a.size() == 0) return fail("Dexcom: no readings in the last 24 h");
-    JsonObject o = a[0];
-    int val = o["Value"] | 0;
-    if (val <= 0) return fail("Dexcom: reading has no value");
-    Trend t = o["Trend"].is<int>() ? trendFromDexcomNumber(o["Trend"].as<int>()) : trendFromName(o["Trend"] | "");
-    const char* ts = o["ST"] | (o["DT"] | (o["WT"] | ""));  // "Date(1700000000000)" or "/Date(...-0500)/"
-    const char* p = strchr(ts, '(');
-    time_t when = p ? (time_t)(strtoll(p + 1, nullptr, 10) / 1000) : 0;
-    return succeed(val, t, when);
+    if (a.isNull() || a.size() == 0) return fail("Dexcom: no readings in the last 30 min");
+    Reading newest;
+    for (JsonObject o : a) {
+      int val = o["Value"] | 0;
+      Trend t = o["Trend"].is<int>() ? trendFromDexcomNumber(o["Trend"].as<int>()) : trendFromName(o["Trend"] | "");
+      const char* ts = o["ST"] | (o["DT"] | (o["WT"] | ""));  // "Date(1700000000000)" or "/Date(...-0500)/"
+      const char* p = strchr(ts, '(');
+      time_t when = p ? (time_t)(strtoll(p + 1, nullptr, 10) / 1000) : 0;
+      if (val <= 0 || when <= 0) continue;
+      historyAdd(val, when, t);
+      if (when > newest.when) { newest.valid = true; newest.mgdl = val; newest.when = when; newest.trend = t; }
+    }
+    if (!newest.valid) return fail("Dexcom: reading has no value");
+    return succeed(newest.mgdl, newest.trend, newest.when);
   }
   return fail("Dexcom: session expired");
 }
 
 // ---------- LibreLinkUp ----------
 
-static String lluToken, lluAccountHash, lluRegion;
+static String lluToken, lluAccountHash, lluRegion, lluPatient;
+
+// "M/D/YYYY h:mm:ss AM" (UTC) -> epoch seconds, 0 if unreadable
+static time_t parseLibreStamp(const char* str) {
+  int mo, d, y, H, M, S;
+  char ap[3] = {};
+  if (sscanf(str, "%d/%d/%d %d:%d:%d %2s", &mo, &d, &y, &H, &M, &S, ap) != 7) return 0;
+  if (!strcmp(ap, "PM") && H < 12) H += 12;
+  if (!strcmp(ap, "AM") && H == 12) H = 0;
+  return civilToEpoch(y, mo, d, H, M, S);
+}
 
 static String lluBase(const String& region) { return "https://api-" + region + ".libreview.io"; }
 
@@ -297,15 +367,29 @@ static FetchResult fetchLibre() {
     JsonObject gm = conns[0]["glucoseMeasurement"];
     int mgdl = (int)lround(gm["ValueInMgPerDl"] | 0.0);
     if (mgdl <= 0) return fail("LibreLinkUp: no glucose measurement");
-    int mo, d, y, H, M, S;
-    char ap[3] = {};
-    time_t when = 0;  // FactoryTimestamp is UTC, "M/D/YYYY h:mm:ss AM"
-    if (sscanf(gm["FactoryTimestamp"] | "", "%d/%d/%d %d:%d:%d %2s", &mo, &d, &y, &H, &M, &S, ap) == 7) {
-      if (!strcmp(ap, "PM") && H < 12) H += 12;
-      if (!strcmp(ap, "AM") && H == 12) H = 0;
-      when = civilToEpoch(y, mo, d, H, M, S);
+    time_t when = parseLibreStamp(gm["FactoryTimestamp"] | "");  // UTC
+    Trend trend = trendFromLibreArrow(gm["TrendArrow"] | 0);
+    lluPatient = String(conns[0]["patientId"] | "");
+    historyAdd(mgdl, when, trend);
+
+    // The connections call only has the latest value: fetch the graph when ~15 min of history is missing.
+    static unsigned long lastBackfill = 0;
+    Reading latest;
+    latest.valid = true; latest.mgdl = mgdl; latest.when = when;
+    if (lluPatient.length() && !glucoseDeltas(latest).has15 && (!lastBackfill || millis() - lastBackfill > 300000UL)) {
+      lastBackfill = millis();
+      HttpResponse g = httpRequest("GET", lluBase(lluRegion) + "/llu/connections/" + lluPatient + "/graph", "", lluHeaders(true));
+      if (g.status == 200) {
+        JsonDocument filter;
+        filter["data"]["graphData"][0]["ValueInMgPerDl"] = true;
+        filter["data"]["graphData"][0]["FactoryTimestamp"] = true;
+        JsonDocument gd;
+        if (!deserializeJson(gd, g.body.c_str(), DeserializationOption::Filter(filter)))
+          for (JsonObject o : gd["data"]["graphData"].as<JsonArray>())
+            historyAdd((int)lround(o["ValueInMgPerDl"] | 0.0), parseLibreStamp(o["FactoryTimestamp"] | ""), TREND_UNKNOWN);
+      }
     }
-    return succeed(mgdl, trendFromLibreArrow(gm["TrendArrow"] | 0), when);
+    return succeed(mgdl, trend, when);
   }
   return fail("LibreLinkUp: session expired");
 }
@@ -330,7 +414,8 @@ FetchResult fetchGlucose() {
                "|" + cfgGet("dex_user") + cfgGet("dex_pass") + cfgGet("dex_region");
   if (key != cacheKey) {
     cacheKey = key;
-    dexSession = lluToken = lluAccountHash = lluRegion = "";
+    dexSession = lluToken = lluAccountHash = lluRegion = lluPatient = "";
+    historyClear();
   }
 
   if (WiFi.status() != WL_CONNECTED) return fail("WiFi disconnected");

@@ -13,6 +13,7 @@ EPaper epaper;
 static bool online = false;
 static unsigned long nextFetch = 0;
 static Reading lastGood;
+static Deltas deltas;
 static String lastError;
 
 static void refresh() {
@@ -23,7 +24,8 @@ static void refresh() {
   } else {
     lastError = r.error;
   }
-  drawDashboard(epaper, lastGood, lastError, r.notConfigured, "http://" + WiFi.localIP().toString());
+  deltas = glucoseDeltas(lastGood);
+  drawDashboard(epaper, lastGood, deltas, lastError, r.notConfigured, "http://" + WiFi.localIP().toString());
 
   unsigned long wait = (unsigned long)refreshMinutes() * 60000UL;
   if (!r.ok) {
@@ -36,7 +38,8 @@ static void refresh() {
     else wait = age > 500 ? 60000UL : 10000UL;
   }
   nextFetch = millis() + wait;
-  if (r.ok) Serial.printf("fetch ok: %d mg/dL, next fetch in %lu s\n", lastGood.mgdl, wait / 1000);
+  if (r.ok) Serial.printf("fetch ok: %d mg/dL, delta last %s%d, delta 15 min %s%d, next fetch in %lu s\n", lastGood.mgdl,
+                          deltas.has1 ? "" : "n/a ", deltas.d1, deltas.has15 ? "" : "n/a ", deltas.d15, wait / 1000);
   else Serial.printf("fetch failed: %s (next in %lu s)\n", r.error.c_str(), wait / 1000);
 }
 

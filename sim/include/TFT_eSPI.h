@@ -8,6 +8,10 @@
 #define TFT_DARKGREY 0xA
 #define TFT_LIGHTGREY 0x5
 
+// Font 8 glyph data, as exposed by Seeed_GFX's Font72rle.h (defined in sim_main.cpp).
+extern const unsigned char widtbl_f72[96];
+extern const unsigned char* const chrtbl_f72[96];
+
 #define SIM_W 800
 #define SIM_H 480
 

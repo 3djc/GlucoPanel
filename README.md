@@ -24,7 +24,15 @@ Open the address shown on the display from any device on the same network.
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
-The panel then shows the latest reading, trend arrow, LOW / IN RANGE / HIGH and its age, and refetches on a timer. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
+The panel then shows the dashboard and refetches on a timer. The screen is laid out as a 3 × 3 grid of blocks (no grid lines are drawn):
+
+| | | |
+| --- | --- | --- |
+| trend arrow | change vs the previous reading | change vs 15 min ago |
+| _(empty)_ | **glucose value** | _(empty)_ |
+| _(empty)_ | _(empty)_ | _(empty)_ |
+
+Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (Dexcom 30 min, Nightscout 30 entries, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/display.cpp`, 0 to 16 dots per 4×4 pixels). A thin strip at the very bottom shows the reading's age (left) and the last fetch error. The low/high thresholds are stored but not used on screen yet. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
 Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
@@ -35,7 +43,7 @@ Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Pa
 Full refreshes flash and wear the panel, so `src/display.cpp` avoids them:
 
 - **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and every 30 minutes to clear ghosting (`FULL_REFRESH_MS`).
-- **Partial refresh** of just the changed window for everything else: the number block when a fetch brings a new value or trend, the "Updated N min ago" line once a minute, and the error footer.
+- **Partial refresh** of one window covering just the blocks that changed (arrow, deltas, value), the "Updated N min ago" strip once a minute, and the error text.
 - **No refresh** when a fetch changes nothing, e.g. repeated identical errors.
 
 The sim logs every refresh (`epaper: FULL refresh` / `partial refresh`) so you can check this.

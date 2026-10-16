@@ -19,14 +19,23 @@ TRENDS = ["DoubleDown", "SingleDown", "FortyFiveDown", "Flat", "FortyFiveUp", "S
 
 START = time.time()
 
-def reading():
-    t = time.time()
+def at(t):
+    """Glucose value and trend index at time t (a slow wave)."""
     phase = t / 90.0
     mgdl = round(130 + 70 * math.sin(phase))
     slope = math.cos(phase)  # -1..1
     idx = min(6, max(0, round((slope + 1) / 2 * 6)))
+    return mgdl, idx
+
+def reading():
     # measured two minutes ago; MOCK_FREEZE=1 keeps one measurement time so its age keeps growing
-    return mgdl, idx, (START - 100 if os.environ.get("MOCK_FREEZE") else t - 120)
+    ts = START - 100 if os.environ.get("MOCK_FREEZE") else time.time() - 120
+    return at(ts) + (ts,)
+
+def libre_stamp(ts):
+    d = datetime.fromtimestamp(ts, timezone.utc)
+    return "%d/%d/%d %d:%02d:%02d %s" % (d.month, d.day, d.year, d.hour % 12 or 12, d.minute, d.second,
+                                          "PM" if d.hour >= 12 else "AM")
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
@@ -51,18 +60,27 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/v1/entries/sgv.json":
             if q.get("token", ["tok"])[0] != "tok":
                 return self.reply(401, {"status": 401, "message": "Unauthorized"})
-            return self.reply(200, [{"sgv": mgdl, "direction": TRENDS[idx], "date": int(ts * 1000)}])
+            n = min(int(q.get("count", ["1"])[0]), 40)
+            out = []
+            for i in range(n):
+                v, k = at(ts - 300 * i)
+                out.append({"sgv": v, "direction": TRENDS[k], "date": int((ts - 300 * i) * 1000)})
+            return self.reply(200, out)
         if u.path == "/llu/connections":
             want = hashlib.sha256(LIBRE_USER_ID.encode()).hexdigest()
             if (self.headers.get("Authorization") != "Bearer " + TOKEN or self.headers.get("account-id") != want
                     or self.headers.get("product") != "llu.android" or not self.headers.get("version")):
                 return self.reply(401, {"status": 401})
-            d = datetime.fromtimestamp(ts, timezone.utc)
-            stamp = "%d/%d/%d %d:%02d:%02d %s" % (d.month, d.day, d.year, d.hour % 12 or 12, d.minute, d.second,
-                                                   "PM" if d.hour >= 12 else "AM")
             arrow = {0: 1, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 5}[idx]
             return self.reply(200, {"status": 0, "data": [{"patientId": "p1", "glucoseMeasurement": {
-                "ValueInMgPerDl": mgdl, "TrendArrow": arrow, "FactoryTimestamp": stamp}}]})
+                "ValueInMgPerDl": mgdl, "TrendArrow": arrow, "FactoryTimestamp": libre_stamp(ts)}}]})
+        if u.path == "/llu/connections/p1/graph":
+            want = hashlib.sha256(LIBRE_USER_ID.encode()).hexdigest()
+            if self.headers.get("Authorization") != "Bearer " + TOKEN or self.headers.get("account-id") != want:
+                return self.reply(401, {"status": 401})
+            # like the real graph: history points 15 min apart, newest first
+            graph = [{"ValueInMgPerDl": at(ts - 900 * i)[0], "FactoryTimestamp": libre_stamp(ts - 900 * i)} for i in range(1, 9)]
+            return self.reply(200, {"status": 0, "data": {"connection": {}, "graphData": graph}})
         self.reply(404, {"error": "not found"})
 
     def do_POST(self):
@@ -81,12 +99,17 @@ class H(BaseHTTPRequestHandler):
         if u.path.endswith("/Publisher/ReadPublisherLatestGlucoseValues"):
             if q.get("sessionId", [""])[0] != SESSION:
                 return self.reply(500, {"Code": "SessionNotValid", "Message": "session"})
-            mgdl, idx, ts = reading()
-            dexnum = {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1}[idx]
-            ms = int(ts * 1000)
-            rec = {"WT": "Date(%d)" % ms, "ST": "Date(%d)" % ms, "DT": "Date(%d-0500)" % ms, "Value": mgdl,
-                   "Trend": TRENDS[idx] if int(ts) % 2 else dexnum}  # alternate string / numeric trend forms
-            return self.reply(200, [rec])
+            _, _, ts = reading()
+            n = min(int(q.get("maxCount", ["1"])[0]), 8)
+            out = []
+            for i in range(n):
+                t = ts - 300 * i
+                mgdl, idx = at(t)
+                dexnum = {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1}[idx]
+                ms = int(t * 1000)
+                out.append({"WT": "Date(%d)" % ms, "ST": "Date(%d)" % ms, "DT": "Date(%d-0500)" % ms, "Value": mgdl,
+                            "Trend": TRENDS[idx] if int(t) % 2 else dexnum})  # alternate string / numeric trend forms
+            return self.reply(200, out)
         if u.path == "/llu/auth/login":
             if b.get("email") == "redirect@test" and "api-de" not in host:
                 return self.reply(200, {"status": 0, "data": {"redirect": True, "region": "de"}})
