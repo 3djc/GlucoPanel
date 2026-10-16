@@ -1,0 +1,22 @@
+// WiFi shim (sim only).
+#pragma once
+#include <Arduino.h>
+
+#define WIFI_STA 1
+#define WL_CONNECTED 3
+#define WL_DISCONNECTED 6
+
+extern bool sim_wifi_connected;  // sim_main.cpp
+
+struct IPAddress {
+  String toString() const { return "192.168.1.42"; }
+};
+
+struct WiFiShim {
+  void mode(int) {}
+  void begin() {}
+  int status() const { return sim_wifi_connected ? WL_CONNECTED : WL_DISCONNECTED; }
+  String SSID() const { return "SimNetwork"; }
+  IPAddress localIP() const { return {}; }
+};
+static WiFiShim WiFi;
