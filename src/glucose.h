@@ -51,6 +51,19 @@ struct Stats {
 };
 Stats glucoseStats(int low, int high);
 
+// HbA1c estimate (the "GMI": 3.31 + 0.02392 x mean glucose in mg/dL, in %). It needs two weeks of
+// readings, far more than is kept in RAM, so the fetchers also add every reading to per-day totals that
+// are saved in flash (every 30 min) and survive a restart. Not a lab HbA1c: it can differ by 0.5 % or more.
+#define HBA1C_DAYS 14           // days the estimate looks at
+#define HBA1C_MIN_COVERAGE 0.7  // share of those days that must have readings (the usual CGM rule)
+struct Hba1c {
+  bool ok = false;         // false until there is enough data
+  float coveredDays = 0;   // days of readings found in the window
+  float percent = 0;       // NGSP, %
+  float mmolMol = 0;       // IFCC, mmol/mol
+};
+Hba1c glucoseHba1c();
+
 // Copies the newest `max` collected readings (ascending by time) into `out`; returns how many.
 int glucoseHistory(Reading* out, int max);
 

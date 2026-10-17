@@ -70,7 +70,7 @@ static String editorTexts() {
          "',ra:'" + jsq(T("reading age")) + "',min:'" + jsq(T("%d min")) + "',avg:'" + jsq(T("average")) + "',inr:'" + jsq(T("in range")) +
          "',mm:'" + jsq(T("lowest / highest")) + "',var:'" + jsq(T("variability")) + "',low:'" + jsq(T("low")) + "',high:'" + jsq(T("high")) +
          "',sd:'" + jsq(T("SD")) + "',empty:'" + jsq(T("empty")) + "',tap:'" + jsq(T("Tap a block, then pick what it shows.")) +
-         "',choose:'" + jsq(T("Choose what to show: %s")) + "',date:'" + jsq(d.c_str()) + "'};";
+         "',choose:'" + jsq(T("Choose what to show: %s")) + "',date:'" + jsq(d.c_str()) + "',hba:'" + jsq(T("estimated HbA1c")) + "',over:'" + jsq(T("over %d days")) + "'};";
 }
 
 
@@ -114,7 +114,7 @@ if(!dash||sel.some(x=>!x))return;
 fb.style.display='none';
 const unit=document.querySelector('[name=unit]');
 function pv(t){
- const mm=unit&&unit.value=='mmol',v=mm?'7.1':'128',u=mm?'mmol/L':'mg/dL',d1=mm?'-0.3':'-5',d15=mm?'+0.6':'+11';
+ const hu=document.querySelector('[name=hba1c_unit]'),PCT=!hu||hu.value=='percent',mm=unit&&unit.value=='mmol',v=mm?'7.1':'128',u=mm?'mmol/L':'mg/dL',d1=mm?'-0.3':'-5',d15=mm?'+0.6':'+11';
  switch(t){
  case 'value':return '<b class=big>'+v+'</b><i class=unit>'+u+'</i>';
  case 'arrow':return '<svg class=ar viewBox="-50 -50 100 100"><g transform="rotate(45)"><rect x="-45" y="-3" width="62" height="6"/><polygon points="45,0 14,-25 14,25"/></g></svg>';
@@ -128,6 +128,7 @@ function pv(t){
  case 'tir':return '<i class=cap>'+L.inr+' 16 h</i><b class=num>72%</b><i class=cap>'+L.low+' 3%   '+L.high+' 25%</i>';
  case 'range':return '<i class=cap>'+L.mm+'</i><b class=num>'+(mm?'3.6 - 12.9':'65 - 232')+'</b>';
  case 'cv':return '<i class=cap>'+L.var+' 16 h</i><b class=num>28%</b><i class=cap>'+L.sd+' '+(mm?'2.1':'38')+'</i>';
+ case 'hba1c':return '<i class=cap>'+L.hba+'</i><b class=num>'+(PCT?'6.4%':'46 mmol/mol')+'</b><i class=cap>'+L.over.replace('%d',14)+'</i>';
  case 'graph':return '<svg class=gr viewBox="0 0 200 60" preserveAspectRatio="none"><rect x="14" y="20" width="182" height="22" fill="#ddd"/><path d="M14 8V54H196" fill="none" stroke="#000" stroke-width="1.5"/><path d="M14 20H196M14 42H196" stroke="#000" stroke-width=".6" stroke-dasharray="3 3"/><path d="M16 46C40 50 60 40 85 34S130 14 150 22 180 34 190 30" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="190" cy="30" r="3.4"/></svg>';
  default:return '<span class=none>'+L.empty+'</span>';}
 }
@@ -148,6 +149,7 @@ function choose(i){
   pal.appendChild(b);});
 }
 if(unit)unit.addEventListener('change',paintAll);
+const hu0=document.querySelector('[name=hba1c_unit]');if(hu0)hu0.addEventListener('change',paintAll);
 paintAll();
 pal.innerHTML='<p class=hint style="grid-column:1/-1">'+L.tap+'</p>';
 })();

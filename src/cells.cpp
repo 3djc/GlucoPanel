@@ -258,13 +258,41 @@ void updateStat(Cell& c, const CellView& v) {
   setText(c.c, sub.c_str());
 }
 
+void updateHba1c(Cell& c, const CellView& v) {
+  Hba1c h = glucoseHba1c();
+  char buf[64];
+  setText(c.b, T("estimated HbA1c"));
+  if (h.ok) {
+    char over[24];
+    snprintf(over, sizeof(over), T("over %d days"), HBA1C_DAYS);
+    if (v.hba1cMmolMol) {  // the unit goes in the small line: it does not fit next to the big number
+      snprintf(buf, sizeof(buf), "%d", (int)lroundf(h.mmolMol));
+      snprintf(buf + 24, 40, "mmol/mol, %s", over);
+    } else {
+      snprintf(buf, sizeof(buf), "%.1f%%", h.percent);
+      snprintf(buf + 24, 40, "%s", over);
+    }
+  } else {
+    snprintf(buf, sizeof(buf), "%s", T("Not available yet"));
+    snprintf(buf + 24, 40, T("%.1f / %d days"), h.coveredDays, HBA1C_DAYS);
+  }
+  // the number is big; the "not available" text is a smaller, wrapping one
+  const lv_font_t* f = h.ok ? &font_ui_48 : &font_ui_24;
+  if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) {
+    lv_obj_set_style_text_font(c.a, f, LV_PART_MAIN);
+    lv_obj_set_y(c.a, centreY(c) - (h.ok ? 21 : 12));
+  }
+  setText(c.a, buf);
+  setText(c.c, buf + 24);
+}
+
 }  // namespace
 
 CellType cellTypeFromString(const String& s) {
   static const struct { const char* name; CellType type; } table[] = {
       {"value", CELL_VALUE}, {"arrow", CELL_ARROW}, {"delta1", CELL_DELTA1}, {"delta15", CELL_DELTA15},
       {"clock", CELL_CLOCK}, {"readtime", CELL_READTIME}, {"age", CELL_AGE}, {"fresh", CELL_FRESH},
-      {"avg", CELL_AVG}, {"tir", CELL_TIR}, {"range", CELL_RANGE}, {"cv", CELL_CV}, {"graph", CELL_GRAPH}};
+      {"avg", CELL_AVG}, {"tir", CELL_TIR}, {"range", CELL_RANGE}, {"cv", CELL_CV}, {"hba1c", CELL_HBA1C}, {"graph", CELL_GRAPH}};
   for (const auto& e : table)
     if (s == e.name) return e.type;
   return CELL_NONE;
@@ -287,6 +315,10 @@ void cellBuild(Cell& c) {
     case CELL_TIR: buildStat(c, ""); break;
     case CELL_RANGE: buildStat(c, ""); break;
     case CELL_CV: buildStat(c, ""); break;
+    case CELL_HBA1C:
+      buildStat(c, "");
+      lv_label_set_long_mode(c.a, LV_LABEL_LONG_WRAP);  // "Not available yet" may need two lines
+      break;
     case CELL_GRAPH: c.a = graphCreate(c.parent, c.x, c.y, c.w, c.h); break;
     default: break;
   }
@@ -306,6 +338,7 @@ void cellUpdate(Cell& c, const CellView& v) {
     case CELL_TIR:
     case CELL_RANGE:
     case CELL_CV: updateStat(c, v); break;
+    case CELL_HBA1C: updateHba1c(c, v); break;
     case CELL_GRAPH: {
       long stamp = (long)v.last.when * 2 + (v.mmol ? 1 : 0);  // the graph only changes with a new reading or unit
       if (stamp != c.stamp) {

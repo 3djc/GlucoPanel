@@ -128,6 +128,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
   view.mmol = cfgGet("unit") == "mmol";
   view.low = atoi(cfgGet("low").c_str());
   view.high = atoi(cfgGet("high").c_str());
+  view.hba1cMmolMol = cfgGet("hba1c_unit") == "mmolmol";
 
   bool layoutChanged = shown.mode == MODE_NONE || mode != shown.mode || layout != shown.layout;
 

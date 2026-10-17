@@ -20,6 +20,7 @@ enum CellType {
   CELL_TIR,        // time in range (between the low and high limits), with time below / above
   CELL_RANGE,      // lowest and highest reading
   CELL_CV,         // glucose variability: coefficient of variation, with the standard deviation
+  CELL_HBA1C,      // estimated HbA1c (GMI), or "Not available yet" until there is enough data
   CELL_GRAPH,      // glucose graph (bottom block)
 };
 
@@ -31,6 +32,7 @@ struct CellView {
   Deltas deltas;
   bool mmol = false;
   int low = 70, high = 180;  // limits in mg/dL, for the statistics
+  bool hba1cMmolMol = false;  // show the HbA1c in mmol/mol instead of %
 };
 
 struct Cell {

@@ -5,7 +5,7 @@
 #define BLOCK_OPTIONS \
   "none:Empty|value:Glucose value|arrow:Trend arrow|delta1:Change vs last reading|delta15:Change vs 15 min ago|" \
   "clock:Date and time|readtime:Time of the reading|age:Age of the reading|fresh:Freshness bar|" \
-  "avg:Average glucose|tir:Time in range|range:Lowest and highest|cv:Variability (CV)"
+  "avg:Average glucose|tir:Time in range|range:Lowest and highest|cv:Variability (CV)|hba1c:Estimated HbA1c"
 
 const ConfigField CONFIG_FIELDS[] = {
   {"lang", "Language", "select", "", "en:English|fr:Français|de:Deutsch|it:Italiano|es:Español", "en"},
@@ -25,6 +25,7 @@ const ConfigField CONFIG_FIELDS[] = {
   {"dex_region", "Server", "select", "dexcom", "us:United States|ous:Outside US|jp:Japan", "us"},
 
   {"unit", "Display unit", "select", "", "mgdl:mg/dL|mmol:mmol/L", "mgdl"},
+  {"hba1c_unit", "HbA1c unit", "select", "", "percent:% (NGSP)|mmolmol:mmol/mol (IFCC)", "percent"},
   {"tz", "Time zone", "select", "",
    "UTC0:UTC|GMT0BST,M3.5.0/1,M10.5.0:London|CET-1CEST,M3.5.0,M10.5.0/3:Paris / Berlin / Madrid|EET-2EEST,M3.5.0/3,M10.5.0/4:Helsinki / Athens|"
    "EST5EDT,M3.2.0,M11.1.0:New York|CST6CDT,M3.2.0,M11.1.0:Chicago|MST7MDT,M3.2.0,M11.1.0:Denver|PST8PDT,M3.2.0,M11.1.0:Los Angeles|"

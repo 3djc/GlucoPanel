@@ -227,6 +227,123 @@ Deltas glucoseDeltas(const Reading& latest) {
   return d;
 }
 
+// ---------- long-term daily totals (for the HbA1c estimate) ----------
+
+static const int DAYS_MAX = 30;
+struct DayAcc {
+  uint32_t day;   // UTC days since the epoch
+  uint32_t secs;  // seconds of readings
+  uint64_t sum;   // mg/dL x seconds
+};
+static DayAcc days[DAYS_MAX];  // ascending by day
+static int daysN = 0;
+static time_t accLastWhen = 0;  // newest reading already counted ...
+static int accLastVal = 0;      // ... and its value (its interval is counted when the next one arrives)
+static String accAccount;       // hash of the credentials the totals belong to
+static bool accDirty = false;
+static unsigned long accSavedMs = 0;
+
+static void accClear() {
+  daysN = 0;
+  accLastWhen = 0;
+  accLastVal = 0;
+  accDirty = true;
+}
+
+static void accCredit(time_t when, int mgdl, time_t secs) {
+  uint32_t day = (uint32_t)(when / 86400);
+  int i = daysN - 1;
+  while (i >= 0 && days[i].day > day) i--;
+  if (i < 0 || days[i].day != day) {  // new day: insert after i
+    if (daysN == DAYS_MAX) {          // full: drop the oldest
+      for (int k = 1; k < daysN; k++) days[k - 1] = days[k];
+      daysN--;
+      i--;
+    }
+    for (int k = daysN; k > i + 1; k--) days[k] = days[k - 1];
+    i++;
+    daysN++;
+    days[i] = {day, 0, 0};
+  }
+  days[i].secs += (uint32_t)secs;
+  days[i].sum += (uint64_t)mgdl * (uint64_t)secs;
+}
+
+// "1|<account>|<last when>|<last value>|<day>:<secs>:<sum>;..."
+static String accSerialize() {
+  char head[32];
+  snprintf(head, sizeof(head), "|%ld|%d|", (long)accLastWhen, accLastVal);
+  String s = "1|" + accAccount + head;
+  for (int i = 0; i < daysN; i++) {
+    char b[48];
+    snprintf(b, sizeof(b), "%lu:%lu:%llu;", (unsigned long)days[i].day, (unsigned long)days[i].secs, (unsigned long long)days[i].sum);
+    s += b;
+  }
+  return s;
+}
+
+// Loads the saved totals if they belong to `account`; otherwise starts empty.
+static void accLoad(const String& account) {
+  accClear();
+  accAccount = account;
+  String s = cfgGet("hba1c");
+  const char* p = s.c_str();
+  char acct[80];
+  long lw = 0;
+  int lv = 0, n = 0;
+  if (sscanf(p, "1|%79[^|]|%ld|%d|%n", acct, &lw, &lv, &n) < 3 || n == 0 || account != acct) return;
+  accLastWhen = (time_t)lw;
+  accLastVal = lv;
+  p += n;
+  unsigned long d, sc;
+  unsigned long long sm;
+  int used;
+  while (daysN < DAYS_MAX && sscanf(p, "%lu:%lu:%llu;%n", &d, &sc, &sm, &used) == 3) {
+    days[daysN++] = {(uint32_t)d, (uint32_t)sc, (uint64_t)sm};
+    p += used;
+  }
+  accDirty = false;
+}
+
+// Counts the readings that arrived since the last call.
+static void accIngest() {
+  for (int i = 0; i < histN; i++) {
+    const Reading& r = hist[i];
+    if (r.when <= accLastWhen) continue;
+    if (accLastWhen > 0) {
+      time_t dt = r.when - accLastWhen;
+      accCredit(accLastWhen, accLastVal, dt > 900 ? 900 : dt);  // never across a long gap
+    }
+    accLastWhen = r.when;
+    accLastVal = r.mgdl;
+    accDirty = true;
+  }
+  if (accDirty && (!accSavedMs || millis() - accSavedMs > 30UL * 60UL * 1000UL)) {
+    cfgSet("hba1c", accSerialize());
+    accSavedMs = millis() ? millis() : 1;
+    accDirty = false;
+  }
+}
+
+Hba1c glucoseHba1c() {
+  Hba1c h;
+  if (daysN == 0) return h;
+  const uint32_t newest = days[daysN - 1].day;
+  uint64_t secs = 0, sum = 0;
+  for (int i = 0; i < daysN; i++) {
+    if (days[i].day + HBA1C_DAYS <= newest) continue;  // older than the window
+    secs += days[i].secs;
+    sum += days[i].sum;
+  }
+  h.coveredDays = (float)secs / 86400.0f;
+  if (secs < (uint64_t)(HBA1C_MIN_COVERAGE * HBA1C_DAYS * 86400)) return h;
+  float mean = (float)((double)sum / (double)secs);
+  h.ok = true;
+  h.percent = 3.31f + 0.02392f * mean;
+  h.mmolMol = (h.percent - 2.15f) * 10.929f;
+  return h;
+}
+
 // ---------- Nightscout ----------
 
 static FetchResult fetchNightscout() {
@@ -477,13 +594,14 @@ FetchResult fetchGlucose() {
     cacheKey = key;
     dexSession = lluToken = lluAccountHash = lluRegion = lluPatient = "";
     historyClear();
+    accLoad(sha256Hex(key));  // the saved daily totals only stay if they belong to this account
   }
 
   if (WiFi.status() != WL_CONNECTED) return fail(T("WiFi disconnected"));
   if (time(nullptr) < 1700000000) return fail(T("Waiting for the clock (NTP)"));
 
   String src = cfgGet("source");
-  if (src == "dexcom") return fetchDexcom();
-  if (src == "libre") return fetchLibre();
-  return fetchNightscout();
+  FetchResult r = src == "dexcom" ? fetchDexcom() : src == "libre" ? fetchLibre() : fetchNightscout();
+  if (r.ok) accIngest();
+  return r;
 }
