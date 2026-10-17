@@ -2,6 +2,8 @@
 
 Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800×480 monochrome ePaper, no touch), built with PlatformIO, the Arduino framework and [LVGL](https://lvgl.io) 9.5 for the UI. It includes an SDL2 simulator so you can develop without the device.
 
+![GlucoPanel dashboard in the simulator, with mock data](docs/screenshot.png)
+
 > **Status:** WiFi onboarding, the settings page, glucose fetching (Nightscout, LibreLinkUp, Dexcom Share), the dashboard and the simulator are implemented. The fetchers are tested against a mock server only; they have not been run against the real services or on the device.
 
 ## How it works
@@ -96,7 +98,7 @@ python3 tools/mock_cgm.py                                   # terminal 1
 SIM_API_BASE=http://localhost:9000 pio run -e sim -t exec   # terminal 2
 ```
 
-Set `MOCK_FREEZE=1` on the mock to keep one measurement time so the reading's age keeps growing. Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
+Set `MOCK_PERIOD=2400` on the mock for a slow, realistic glucose curve (the default is a fast demo wave; the screenshot above was taken with it, with `SIM_SCREENSHOT`, so it shows mock data only). Set `MOCK_FREEZE=1` on the mock to keep one measurement time so the reading's age keeps growing. Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
 
 Other variables:
 

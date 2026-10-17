@@ -18,10 +18,11 @@ SESSION = "dex-session-1"
 TRENDS = ["DoubleDown", "SingleDown", "FortyFiveDown", "Flat", "FortyFiveUp", "SingleUp", "DoubleUp"]
 
 START = time.time()
+PERIOD = float(os.environ.get("MOCK_PERIOD", "90"))  # seconds per radian of the wave; ~2400 gives a realistic curve over hours
 
 def at(t):
     """Glucose value and trend index at time t (a slow wave)."""
-    phase = t / 90.0
+    phase = t / PERIOD
     mgdl = round(130 + 70 * math.sin(phase))
     slope = math.cos(phase)  # -1..1
     idx = min(6, max(0, round((slope + 1) / 2 * 6)))
