@@ -9,8 +9,6 @@ Glucose display firmware, built with PlatformIO, the Arduino framework and [LVGL
 
 ![GlucoPanel dashboard in the simulator, with mock data](docs/screenshot.png)
 
-> **Status:** WiFi onboarding, the settings page, glucose fetching (Nightscout, LibreLinkUp, Dexcom Share), the dashboard and the simulator are implemented. The fetchers are tested against a mock server only; they have not been run against the real services or on the device.
-
 ## Medical disclaimer
 
 **GlucoPanel is not a medical device.** It is a hobby project that shows glucose readings fetched from third-party services, and it has not been tested, certified or approved for any medical use.
@@ -73,6 +71,10 @@ The panel then shows the dashboard and refetches on a timer. The screen is a gri
 | bottom row (full width) | | |
 
 Any of the six small blocks can show: nothing, the **glucose value** (big, with its unit), the **trend arrow**, the **change vs the previous reading**, the **change vs 15 min ago**, the **date and time** (local, see the time zone setting), the **time of the reading**, the **age of the reading** (minutes), the **freshness bar** (one segment per minute of age, up to 5), or one of four statistics over the collected history: the **average glucose**, the **time in range** (between your low and high limits, with the time below and above), the **lowest and highest** reading, the **variability** (coefficient of variation, with the standard deviation), or the **estimated HbA1c** (see below). The statistics are time-weighted and their caption says how many hours they cover: Dexcom Share returns about the last 16 h in one request, the panel keeps up to 24 h and builds the rest up while it runs (so the figures cover less right after a restart, and LibreLinkUp only offers its graph history). The bottom row shows the **glucose graph** or nothing. The default layout is arrow / change / change, clock / value / freshness bar, graph. The same content can be used in several blocks. The layout is rebuilt when the settings are saved.
+
+<p align="center"><img src="docs/blocks.png" alt="The layout editor on the settings page, with the choices for one block" width="340"></p>
+
+*The layout editor on the settings page (here for the middle block): a miniature of the dashboard on top, and below it a preview of every choice for the block you tapped.*
 
 Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (the last `GRAPH_HOURS` = 3 h from Dexcom and Nightscout, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). The graph shows the last 3 h as a line (dot on the newest reading), with the low..high thresholds as a light-grey band and the y range following the data (at least 60..200 mg/dL). Readings more than 20 min apart are not joined. A thin strip under it shows the last fetch error. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
