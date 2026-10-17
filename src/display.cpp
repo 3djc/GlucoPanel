@@ -32,6 +32,15 @@ struct Shown {
 } shown;
 CellView view;
 
+// The arguments of the last drawDashboard(), to redraw when the settings screen closes.
+struct LastArgs {
+  Reading last;
+  Deltas d;
+  String error, url;
+  bool notConfigured = false, have = false;
+} lastArgs;
+bool overlay = false;  // the settings screen is up
+
 // Everything that needs the screen to be rebuilt when it changes.
 String layoutSignature() {
   String sig = cfgGet("tz") + "|" + cfgGet("lang");
@@ -109,6 +118,8 @@ void buildReadingScreen() {
 
 void drawDashboard(const Reading& last, const Deltas& d, const String& error,
                    bool notConfigured, const String& configUrl) {
+  lastArgs = {last, d, error, configUrl, notConfigured, true};
+  if (overlay) return;
   Mode mode = notConfigured ? MODE_NOT_CONFIGURED : last.valid ? MODE_READING : MODE_NO_DATA;
   String name = sourceName();
   String layout = layoutSignature();
@@ -157,8 +168,20 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
   shown.layout = layout;
 }
 
+void dashboardShowConfig(const String& url) {
+  overlay = true;
+  uiShowConfigQr(url);
+}
+
+void dashboardHideConfig() {
+  if (!overlay) return;
+  overlay = false;
+  shown.mode = MODE_NONE;  // the dashboard widgets are gone: rebuild
+  if (lastArgs.have) drawDashboard(lastArgs.last, lastArgs.d, lastArgs.error, lastArgs.notConfigured, lastArgs.url);
+}
+
 void dashboardTick() {
-  if (shown.mode != MODE_READING) return;
+  if (overlay || shown.mode != MODE_READING) return;
   static unsigned long lastCheck = 0;
   if (millis() - lastCheck < 1000) return;
   lastCheck = millis();

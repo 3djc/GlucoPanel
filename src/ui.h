@@ -34,3 +34,8 @@ void uiShowErasePrompt(const String& ssid);
 void uiShowPortal();  // hotspot + captive portal: QR codes to join and to open the setup page
 void uiShowConnected(const String& ssid, const String& ip, const String& url);
 void uiShowWifiFailed();
+
+// Settings screen opened by a short press of the green button: QR code and address of the settings page.
+void uiShowConfigQr(const String& url);
+// Shown after a long press, just before the saved WiFi is erased and the panel restarts in setup mode.
+void uiShowWifiErased();

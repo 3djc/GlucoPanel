@@ -60,3 +60,12 @@ bool wifiConnect() {
   }
   return ok;
 }
+
+void wifiEraseAndRestart() {
+  uiShowWifiErased();
+  delay(500);
+  WiFiManager wm;
+  wm.resetSettings();
+  ESP.restart();
+  while (true) delay(1000);  // ESP.restart() does not return on the device
+}

@@ -15,6 +15,15 @@ Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800Ã
 3. **No WiFi saved (or erased).** The panel opens an open hotspot named **`GlucoPanel`** with a captive portal. The screen shows two QR codes: one joins the hotspot, one opens `http://192.168.4.1`.
 4. **Connected.** The screen shows the SSID, the IP and a QR code for the settings page, which is also at `http://glucopanel.local`.
 
+### Buttons
+
+On the dashboard the green button (KEY0) does two things:
+
+- **Short press:** shows a screen with a QR code and the address of the settings page. It closes after 60 s or when you press any button.
+- **Hold for 3 s:** erases the saved WiFi and restarts in setup mode (the hotspot described above). This also works while the QR screen is up.
+
+The buttons are only read once the panel is running; the boot-time WiFi prompt above uses KEY0 and KEY1 as described.
+
 ### Settings page
 
 Open the address shown on the display from any device on the same network.
@@ -91,7 +100,7 @@ pio run -e sim -t exec
 - The window is 800Ã—480. **Esc** or closing it quits.
 - **Enter** on the setup screen pretends the WiFi setup finished.
 - The settings page is at <http://localhost:8080>.
-- Keys **1** / **2** stand in for KEY0 / KEY1 (GPIO 3 / 4).
+- Keys **1** / **2** stand in for KEY0 / KEY1 (GPIO 3 / 4). Hold **1** for 3 s to see the WiFi erase.
 - `SIM_WIFI=fail` simulates saved WiFi that can't be joined.
 - Settings are saved in `.sim_prefs` (git-ignored).
 
@@ -111,6 +120,7 @@ Other variables:
 | `SIM_API_BASE=<url>` | Send every HTTP request to this base URL (see above) |
 | `SIM_NOWAIT=1` | Skip waiting for Enter on the setup screen |
 | `SIM_PRESS=<pin>` | Hold that button pin pressed (3 or 4) |
+| `SIM_TAP=<pin>:<start ms>:<duration ms>[,...]` | Press that button during each time window, e.g. `3:4000:300` is a short press at 4 s, `3:3000:4500` a long one |
 | `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
 | `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
 

@@ -11,6 +11,56 @@
 #include "wifi_setup.h"
 
 static bool online = false;
+
+// reTerminal E1001 user buttons (active low, see wifi_setup.cpp): green = KEY0, the other one = KEY1.
+static const int BTN_GREEN = 3, BTN_OTHER = 4;
+static const unsigned long LONG_PRESS_MS = 3000;      // green button: hold this long to erase the WiFi
+static const unsigned long CONFIG_SCREEN_MS = 60000;  // the settings screen closes by itself after this
+
+enum Press { PRESS_NONE, PRESS_SHORT, PRESS_LONG };
+struct Button {
+  int pin;
+  bool down = false, longFired = false;
+  unsigned long since = 0;
+};
+static Button green{BTN_GREEN}, other{BTN_OTHER};
+
+// Poll every loop. SHORT is reported on release, LONG once, as soon as the button has been held long enough.
+static Press pollButton(Button& b) {
+  bool low = digitalRead(b.pin) == LOW;
+  unsigned long now = millis();
+  if (low && !b.down) {
+    b.down = true;
+    b.longFired = false;
+    b.since = now;
+  } else if (low && !b.longFired && now - b.since >= LONG_PRESS_MS) {
+    b.longFired = true;
+    return PRESS_LONG;
+  } else if (!low && b.down) {
+    b.down = false;
+    if (!b.longFired && now - b.since >= 40) return PRESS_SHORT;  // ignore contact bounce
+  }
+  return PRESS_NONE;
+}
+
+static bool configShown = false;
+static unsigned long configSince = 0;
+
+static void handleButtons() {
+  Press g = pollButton(green), o = pollButton(other);
+  if (g == PRESS_LONG) wifiEraseAndRestart();
+  if (configShown) {
+    if (g == PRESS_SHORT || o == PRESS_SHORT || millis() - configSince > CONFIG_SCREEN_MS) {
+      configShown = false;
+      dashboardHideConfig();
+    }
+  } else if (g == PRESS_SHORT && online) {
+    configShown = true;
+    configSince = millis();
+    dashboardShowConfig("http://" + WiFi.localIP().toString());
+  }
+}
+
 static unsigned long nextFetch = 0;
 static Reading lastGood;
 static Deltas deltas;
@@ -55,6 +105,7 @@ void setup() {
 }
 
 void loop() {
+  handleButtons();
   if (online) {
     configServerHandle();
     bool changed = configServerTakeChanged();

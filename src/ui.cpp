@@ -5,6 +5,14 @@
 #include "lvgl_port.h"
 #include "wifi_setup.h"  // AP_NAME
 
+// A black label that wraps at `width`.
+static lv_obj_t* wrapLabel(lv_obj_t* parent, const char* text, const lv_font_t* font, int x, int y, int width) {
+  lv_obj_t* l = uiLabel(parent, text, font, x, y);
+  lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(l, width);
+  return l;
+}
+
 void uiApplyTimeZone() {
   static String applied;
   String tz = cfgGet("tz");
@@ -84,6 +92,26 @@ void uiShowConnected(const String& ssid, const String& ip, const String& url) {
   uiLabel(s, url.c_str(), &font_ui_24, 20, 200);
   uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, 240);
   uiQR(s, 500, 60, 280, url.c_str());
+  portRefresh(true);
+}
+
+void uiShowConfigQr(const String& url) {
+  lv_obj_t* s = uiNewScreen();
+  uiLabel(s, T("Settings"), &font_ui_32, 20, 20);
+  wrapLabel(s, T("Scan to open the settings page:"), &font_ui_16, 20, 100, 440);
+  uiLabel(s, url.c_str(), &font_ui_24, 20, 180);
+  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, 230);
+  uiQR(s, 500, 60, 280, url.c_str());
+  wrapLabel(s, T("Hold the green button for 3 s to erase the WiFi"), &font_ui_16, 20, 400, 760);
+  wrapLabel(s, T("Press any button to close"), &font_ui_16, 20, 432, 760);
+  portRefresh(true);
+}
+
+void uiShowWifiErased() {
+  lv_obj_t* s = uiNewScreen();
+  char msg[200];
+  snprintf(msg, sizeof(msg), T("WiFi erased. Rebooting: join the %s hotspot to set it up again."), AP_NAME);
+  wrapLabel(s, msg, &font_ui_24, 20, 100, 760);
   portRefresh(true);
 }
 

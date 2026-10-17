@@ -21,6 +21,19 @@ bool sim_wifi_connected = false;
 void pinMode(int, int) {}
 int digitalRead(int pin) {
   pump();
+  // SIM_TAP=<pin>:<start ms>:<duration ms>[,...] presses that button during each window (scripted tests)
+  if (const char* taps = getenv("SIM_TAP")) {
+    const char* p = taps;
+    while (*p) {
+      int tp = 0;
+      long start = 0, dur = 0;
+      if (sscanf(p, "%d:%ld:%ld", &tp, &start, &dur) == 3 && tp == pin && (long)millis() >= start && (long)millis() < start + dur)
+        return LOW;
+      const char* comma = strchr(p, ',');
+      if (!comma) break;
+      p = comma + 1;
+    }
+  }
   if (getenv("SIM_PRESS") && atoi(getenv("SIM_PRESS")) == pin) return LOW;
   const Uint8* k = SDL_GetKeyboardState(nullptr);
   SDL_Scancode sc = pin == 3 ? SDL_SCANCODE_1 : pin == 4 ? SDL_SCANCODE_2 : SDL_SCANCODE_3;
