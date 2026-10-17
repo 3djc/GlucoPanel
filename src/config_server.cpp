@@ -167,7 +167,7 @@ static void handleRoot() {
     if (grouped) h += String("<div class='grp' data-g='") + f.group + "'>";
     h += String("<label>") + T(f.label) + "</label>";
     if (!strcmp(f.type, "select")) {
-      h += String("<select name='") + f.key + "'" + (i == 0 ? " id=source" : "") + ">";
+      h += String("<select name='") + f.key + "'" + (!strcmp(f.key, "source") ? " id=source" : "") + ">";
       const char* p = f.options;
       String v, l;
       while (nextOption(p, v, l))
