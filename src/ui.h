@@ -10,6 +10,9 @@
 LV_FONT_DECLARE(font_big_128);
 LV_FONT_DECLARE(font_big_96);
 
+// Applies the time zone chosen in the settings to localtime() (cheap when unchanged).
+void uiApplyTimeZone();
+
 // Empties the active screen (white background, black text, no scrolling) and returns it.
 lv_obj_t* uiNewScreen();
 

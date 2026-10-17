@@ -1,6 +1,17 @@
 #include "ui.h"
+#include <time.h>
+#include "config.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"  // AP_NAME
+
+void uiApplyTimeZone() {
+  static String applied;
+  String tz = cfgGet("tz");
+  if (tz == applied) return;
+  setenv("TZ", tz.c_str(), 1);
+  tzset();
+  applied = tz;
+}
 
 lv_obj_t* uiNewScreen() {
   lv_obj_t* scr = lv_screen_active();

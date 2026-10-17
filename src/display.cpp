@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <math.h>
 #include "config.h"
+#include "graph.h"
 #include "lvgl_port.h"
 #include "ui.h"
 
@@ -15,7 +16,8 @@ enum Mode { MODE_NONE, MODE_NOT_CONFIGURED, MODE_NO_DATA, MODE_READING };
 // Top band (like Gluco-Monitor's): rounded, light grey, three cells.
 const int BAND_X = 6, BAND_Y = 10, BAND_W = 788, BAND_H = 130, BAND_RADIUS = 10;
 const int CELL_W = BAND_W / 3;
-const int STRIP_Y = 452;  // error text along the bottom edge
+const int GRAPH_Y = 322, GRAPH_H = 136;  // third row: the graph spans the full width
+const int STRIP_Y = 458;                 // error text under the graph
 
 // Freshness bar right of the value: SEGMENTS stacked segments, one more filled per minute of age.
 const int SEGMENTS = 5;
@@ -35,7 +37,7 @@ struct Shown {
 
 // Widgets of the reading screen, valid while shown.mode == MODE_READING.
 struct Widgets {
-  lv_obj_t *band, *arrow, *arrowUnknown, *delta1, *delta15, *value, *unit, *date, *time, *error;
+  lv_obj_t *band, *arrow, *arrowUnknown, *delta1, *delta15, *value, *unit, *date, *time, *graph, *error;
   lv_obj_t* seg[SEGMENTS];  // freshness bar
 } w;
 Trend arrowTrend = TREND_UNKNOWN;
@@ -146,13 +148,7 @@ void setValue(int mgdl, bool mmol) {
 void setClock() {
   time_t now = time(nullptr);
   shown.clockMin = now / 60;
-  static String applied;
-  String tz = cfgGet("tz");
-  if (tz != applied) {
-    setenv("TZ", tz.c_str(), 1);
-    tzset();
-    applied = tz;
-  }
+  uiApplyTimeZone();
   struct tm t;
   localtime_r(&now, &t);
   // a label is only touched when its text changes, so the date refreshes once a day, not every minute
@@ -237,7 +233,9 @@ void buildReadingScreen() {
     w.seg[i] = sg;
   }
 
-  w.error = uiLabel(scr, "", &lv_font_montserrat_16, 10, STRIP_Y + 4);
+  w.graph = graphCreate(scr, 0, GRAPH_Y, SCREEN_W, GRAPH_H);
+
+  w.error = uiLabel(scr, "", &lv_font_montserrat_16, 10, STRIP_Y);
   lv_label_set_long_mode(w.error, LV_LABEL_LONG_CLIP);
   lv_obj_set_width(w.error, SCREEN_W - 20);
 }
@@ -270,6 +268,10 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       setValue(last.mgdl, mmol);
       changed = true;
     }
+    if (all) {
+      graphUpdate(w.graph, last.when, mmol);
+      changed = true;
+    }
     if (mins != shown.ageMins || errorChanged) {
       setStrip(mins, error);
       changed = true;
@@ -287,6 +289,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       setValue(last.mgdl, mmol);
       setClock();
       setStrip(mins, error);
+      graphUpdate(w.graph, last.when, mmol);
     } else {
       lv_obj_t* s = uiNewScreen();
       uiLabel(s, name.c_str(), &lv_font_montserrat_32, 20, 20);

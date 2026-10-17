@@ -31,9 +31,9 @@ The panel then shows the dashboard and refetches on a timer. The screen is laid 
 | --- | --- | --- |
 | trend arrow | change vs the previous reading | change vs 15 min ago |
 | date (DD Mon) above clock (HH:MM), local time | **glucose value** | freshness bar (one segment per minute of age, up to 5) |
-| _(empty)_ | _(empty)_ | _(empty)_ |
+| **glucose graph** (last 3 h, spanning all three cells) | | |
 
-Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (Dexcom 30 min, Nightscout 30 entries, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). A thin strip at the very bottom shows the reading's age (left) and the last fetch error. The low/high thresholds are stored but not used on screen yet. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
+Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (the last `GRAPH_HOURS` = 3 h from Dexcom and Nightscout, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). The graph shows the last 3 h as a line (dot on the newest reading), with the low..high thresholds as a light-grey band and the y range following the data (at least 60..200 mg/dL). Readings more than 20 min apart are not joined. A thin strip under it shows the last fetch error. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
 Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
@@ -124,6 +124,7 @@ src/
   glucose.*         Nightscout / LibreLinkUp / Dexcom fetchers
   lvgl_port.*       LVGL <-> ePaper glue: flush callback (black/white + dither), full/partial refresh policy
   ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
+  graph.*           glucose graph widget (line, low/high band, hour ticks)
   display.*         dashboard screen (LVGL widgets, trend arrow)
   font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
   http.*            HTTP(S) client (device)

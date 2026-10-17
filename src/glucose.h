@@ -29,6 +29,14 @@ struct Deltas {
 };
 Deltas glucoseDeltas(const Reading& latest);
 
+// Width of the dashboard graph. Fetchers ask their source for at least this much history.
+#ifndef GRAPH_HOURS
+#define GRAPH_HOURS 3
+#endif
+
+// Copies the newest `max` collected readings (ascending by time) into `out`; returns how many.
+int glucoseHistory(Reading* out, int max);
+
 void glucoseInit();       // starts NTP (timestamps need a correct clock)
 FetchResult fetchGlucose();  // fetches from the data source chosen in the settings page
 const char* sourceName();    // display name of the configured source

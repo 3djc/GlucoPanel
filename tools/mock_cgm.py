@@ -60,7 +60,7 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/v1/entries/sgv.json":
             if q.get("token", ["tok"])[0] != "tok":
                 return self.reply(401, {"status": 401, "message": "Unauthorized"})
-            n = min(int(q.get("count", ["1"])[0]), 40)
+            n = min(int(q.get("count", ["1"])[0]), 200)
             out = []
             for i in range(n):
                 v, k = at(ts - 300 * i)
@@ -79,7 +79,7 @@ class H(BaseHTTPRequestHandler):
             if self.headers.get("Authorization") != "Bearer " + TOKEN or self.headers.get("account-id") != want:
                 return self.reply(401, {"status": 401})
             # like the real graph: history points 15 min apart, newest first
-            graph = [{"ValueInMgPerDl": at(ts - 900 * i)[0], "FactoryTimestamp": libre_stamp(ts - 900 * i)} for i in range(1, 9)]
+            graph = [{"ValueInMgPerDl": at(ts - 900 * i)[0], "FactoryTimestamp": libre_stamp(ts - 900 * i)} for i in range(1, 49)]
             return self.reply(200, {"status": 0, "data": {"connection": {}, "graphData": graph}})
         self.reply(404, {"error": "not found"})
 
@@ -100,7 +100,7 @@ class H(BaseHTTPRequestHandler):
             if q.get("sessionId", [""])[0] != SESSION:
                 return self.reply(500, {"Code": "SessionNotValid", "Message": "session"})
             _, _, ts = reading()
-            n = min(int(q.get("maxCount", ["1"])[0]), 8)
+            n = min(int(q.get("maxCount", ["1"])[0]), 200)
             out = []
             for i in range(n):
                 t = ts - 300 * i

@@ -123,9 +123,10 @@ static Trend trendFromLibreArrow(int n) {  // 1 = SingleDown ... 5 = SingleUp
   return n >= 1 && n <= 5 ? t[n] : TREND_UNKNOWN;
 }
 
-// ---------- reading history (for the deltas) ----------
+// ---------- reading history (for the deltas and the graph) ----------
 
-static const int HIST_MAX = 96;
+// Libre only reports the latest value each minute, so ~1 point/min can pile up over the graph window.
+static const int HIST_MAX = GRAPH_HOURS * 60 + 60;
 static Reading hist[HIST_MAX];  // ascending by time
 static int histN = 0;
 
@@ -146,6 +147,14 @@ static void historyAdd(int mgdl, time_t when, Trend trend) {
   hist[i].trend = trend;
   hist[i].when = when;
 }
+
+int glucoseHistory(Reading* out, int max) {
+  int n = histN < max ? histN : max;
+  for (int i = 0; i < n; i++) out[i] = hist[histN - n + i];  // the newest n, ascending
+  return n;
+}
+
+static time_t historySpan() { return histN ? hist[histN - 1].when - hist[0].when : 0; }
 
 Deltas glucoseDeltas(const Reading& latest) {
   Deltas d;
@@ -172,7 +181,7 @@ Deltas glucoseDeltas(const Reading& latest) {
 static FetchResult fetchNightscout() {
   String base = cfgGet("ns_url");
   if (!base.length()) { FetchResult r; r.notConfigured = true; r.error = "Nightscout URL not set"; return r; }
-  String url = base + "/api/v1/entries/sgv.json?count=30";  // ~15+ min of history for the deltas
+  String url = base + "/api/v1/entries/sgv.json?count=" + String(GRAPH_HOURS * 12 + 6);  // one reading per 5 min over the graph window
   String tok = cfgGet("ns_token");
   if (tok.length()) url += "&token=" + urlEncode(tok);
 
@@ -259,7 +268,7 @@ static FetchResult fetchDexcom() {
     String error;
     if (!dexSession.length() && !dexLogin(error)) return fail(error);
     HttpResponse r = httpRequest("POST",
-        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=30&maxCount=8",
+        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=" + String(GRAPH_HOURS * 60 + 10) + "&maxCount=" + String(GRAPH_HOURS * 24 + 8),
         "", {{"Content-Type", "application/json"}, {"Accept", "application/json"}});
     if (r.status <= 0) return fail("Dexcom: " + r.error);
     String code = dexErrorCode(r.body);
@@ -269,7 +278,7 @@ static FetchResult fetchDexcom() {
     JsonDocument doc;
     if (deserializeJson(doc, r.body.c_str())) return fail("Dexcom: unreadable response");
     JsonArray a = doc.as<JsonArray>();
-    if (a.isNull() || a.size() == 0) return fail("Dexcom: no readings in the last 30 min");
+    if (a.isNull() || a.size() == 0) return fail("Dexcom: no recent readings");
     Reading newest;
     for (JsonObject o : a) {
       int val = o["Value"] | 0;
@@ -372,11 +381,12 @@ static FetchResult fetchLibre() {
     lluPatient = String(conns[0]["patientId"] | "");
     historyAdd(mgdl, when, trend);
 
-    // The connections call only has the latest value: fetch the graph when ~15 min of history is missing.
+    // The connections call only has the latest value: fetch the graph when ~15 min of history
+    // (deltas) or part of the graph window is missing.
     static unsigned long lastBackfill = 0;
     Reading latest;
     latest.valid = true; latest.mgdl = mgdl; latest.when = when;
-    if (lluPatient.length() && !glucoseDeltas(latest).has15 && (!lastBackfill || millis() - lastBackfill > 300000UL)) {
+    if (lluPatient.length() && (!glucoseDeltas(latest).has15 || historySpan() < GRAPH_HOURS * 3600 - 900) && (!lastBackfill || millis() - lastBackfill > 300000UL)) {
       lastBackfill = millis();
       HttpResponse g = httpRequest("GET", lluBase(lluRegion) + "/llu/connections/" + lluPatient + "/graph", "", lluHeaders(true));
       if (g.status == 200) {
