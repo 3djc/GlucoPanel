@@ -8,10 +8,60 @@
 #include <WiFiManager.h>
 #include "config.h"
 #include "i18n.h"
+#include "secrets.h"
 #include "wifi_setup.h"  // AP_NAME
 
 static WebServer server(80);
 static bool settingsChanged = false;
+
+// ---- access control ----
+// The settings page needs a 6-digit code that only the panel shows (on its screens and in the QR code),
+// so changing settings takes someone who can see the panel. A valid code starts a session (a cookie, 30 min
+// since the last request). Wrong codes are rate limited. This keeps other devices on the network out; the
+// page itself is still plain HTTP, so it does not protect against someone who can read your WiFi traffic.
+static const unsigned long SESSION_MS = 30UL * 60UL * 1000UL, LOCKOUT_MS = 60UL * 1000UL;
+static const int MAX_FAILURES = 5;
+static String configCode, sessionToken;
+static unsigned long sessionUntil = 0, lockedUntil = 0;
+static int failures = 0;
+
+String configServerNewCode() {
+  configCode = randomToken(6, "0123456789");
+  failures = 0;
+  return configCode;
+}
+
+String configServerCode() { return configCode.length() ? configCode : configServerNewCode(); }
+
+static bool before(unsigned long now, unsigned long deadline) { return (long)(deadline - now) > 0; }  // millis() wraps
+
+static bool authorized() {
+  unsigned long now = millis();
+  if (!sessionToken.length() || !before(now, sessionUntil)) return false;
+  if (server.header("Cookie").indexOf(String("gp=") + sessionToken) < 0) return false;
+  sessionUntil = now + SESSION_MS;
+  return true;
+}
+
+// Checks a typed or scanned code; on success starts a session.
+static bool tryCode(const String& code) {
+  unsigned long now = millis();
+  if (lockedUntil && before(now, lockedUntil)) return false;
+  bool ok = code.length() == configCode.length() && configCode.length() > 0;
+  int diff = 0;
+  for (int i = 0; ok && i < code.length(); i++) diff |= code[i] ^ configCode[i];  // no early exit on the first wrong digit
+  if (ok && diff == 0) {
+    failures = 0;
+    sessionToken = randomToken(24, "abcdefghijklmnopqrstuvwxyz0123456789");
+    sessionUntil = now + SESSION_MS;
+    return true;
+  }
+  if (++failures >= MAX_FAILURES) {
+    lockedUntil = now + LOCKOUT_MS;
+    failures = 0;
+  }
+  return false;
+}
 
 static String esc(const String& s) {
   String o;
@@ -155,7 +205,25 @@ pal.innerHTML='<p class=hint style="grid-column:1/-1">'+L.tap+'</p>';
 })();
 )HTML";
 
+static void sendLogin(int status, const char* message) {
+  String h = pageHead();
+  if (message[0]) h += String("<p class=err>") + message + "</p>";
+  h += String("<p>") + T("Enter the code shown on the panel. Press the green button briefly to show it.") + "</p>" +
+       "<form method=get action=/><input name=k inputmode=numeric pattern='[0-9]*' maxlength=6 autocomplete=off autofocus>" +
+       "<button>" + T("Open") + "</button></form></body></html>";
+  server.send(status, "text/html", h);
+}
+
 static void handleRoot() {
+  if (!authorized()) {
+    if (!server.hasArg("k")) return sendLogin(401, "");
+    unsigned long now = millis();
+    if (lockedUntil && before(now, lockedUntil)) return sendLogin(429, T("Too many attempts, wait a minute."));
+    if (!tryCode(server.arg("k"))) return sendLogin(401, T("Wrong code."));
+    server.sendHeader("Set-Cookie", String("gp=") + sessionToken + "; Path=/; HttpOnly; SameSite=Strict");
+    server.sendHeader("Location", "/");  // drop the code from the address
+    return server.send(303, "text/plain", "");
+  }
   String h = pageHead();
   h += String("<style>") + EDITOR_CSS + "</style>";
   if (server.hasArg("saved")) h += String("<p class=ok>") + T("Saved.") + "</p>";
@@ -211,6 +279,7 @@ static void fail(const String& msg) {
 }
 
 static void handleSave() {
+  if (!authorized()) return server.send(403, "text/plain", "Forbidden");
   String vals[CONFIG_FIELD_COUNT];
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) {
     const ConfigField& f = CONFIG_FIELDS[i];
@@ -255,6 +324,7 @@ static void handleSave() {
 }
 
 static void handleResetWifi() {
+  if (!authorized()) return server.send(403, "text/plain", "Forbidden");
   char msg[200];
   snprintf(msg, sizeof(msg), T("WiFi erased. Rebooting: join the %s hotspot to set it up again."), AP_NAME);
   server.send(200, "text/html", pageHead() + "<p class=ok>" + esc(msg) + "</p></body></html>");
@@ -267,6 +337,8 @@ static void handleResetWifi() {
 void configServerBegin() {
   MDNS.begin("glucopanel");
   MDNS.addService("http", "tcp", 80);
+  static const char* headerKeys[] = {"Cookie"};
+  server.collectHeaders(headerKeys, 1);
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
   server.on("/reset-wifi", HTTP_POST, handleResetWifi);

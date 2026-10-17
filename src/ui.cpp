@@ -59,6 +59,14 @@ lv_obj_t* uiQR(lv_obj_t* parent, int x, int y, int size, const char* text) {
   return qr;
 }
 
+String uiConfigLink(const String& url, const String& code) { return url + "/?k=" + code; }
+
+int uiShowAddressAndCode(lv_obj_t* parent, int x, int y, const String& url, const String& code) {
+  uiLabel(parent, url.c_str(), &font_ui_24, x, y);
+  uiLabel(parent, (String(T("Code:")) + " " + code).c_str(), &font_ui_32, x, y + 36);
+  return y + 36 + 44;
+}
+
 void uiShowErasePrompt(const String& ssid) {
   lv_obj_t* s = uiNewScreen();
   uiLabel(s, T("Cannot join WiFi"), &font_ui_32, 20, 20);
@@ -70,38 +78,39 @@ void uiShowErasePrompt(const String& ssid) {
   portRefresh(true);
 }
 
-void uiShowPortal() {
+void uiShowPortal(const String& hotspotPassword) {
   lv_obj_t* s = uiNewScreen();
   uiLabel(s, T("WiFi setup"), &font_ui_32, 20, 20);
   char join[96];
   snprintf(join, sizeof(join), T("1. Join WiFi %s"), AP_NAME);
   uiLabel(s, join, &font_ui_16, 20, 70);
-  uiQR(s, 56, 110, 280, "WIFI:T:nopass;S:" AP_NAME ";;");
+  uiQR(s, 56, 110, 280, (String("WIFI:T:WPA;S:") + AP_NAME + ";P:" + hotspotPassword + ";;").c_str());
+  uiLabel(s, (String(T("Password")) + ": " + hotspotPassword).c_str(), &font_ui_24, 56, 396);
   uiLabel(s, T("2. Open setup page"), &font_ui_16, 420, 70);
   uiQR(s, 456, 110, 280, "http://192.168.4.1");
   uiLabel(s, T("(or browse to 192.168.4.1)"), &font_ui_16, 420, 420);
   portRefresh(true);
 }
 
-void uiShowConnected(const String& ssid, const String& ip, const String& url) {
+void uiShowConnected(const String& ssid, const String& ip, const String& url, const String& code) {
   lv_obj_t* s = uiNewScreen();
   uiLabel(s, T("WiFi connected"), &font_ui_32, 20, 20);
   uiLabel(s, ("SSID: " + ssid).c_str(), &font_ui_16, 20, 70);
   uiLabel(s, ("IP: " + ip).c_str(), &font_ui_16, 20, 100);
   uiLabel(s, T("Configure the panel at:"), &font_ui_16, 20, 170);
-  uiLabel(s, url.c_str(), &font_ui_24, 20, 200);
-  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, 240);
-  uiQR(s, 500, 60, 280, url.c_str());
+  int next = uiShowAddressAndCode(s, 20, 200, url, code);
+  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, next);
+  uiQR(s, 500, 60, 280, uiConfigLink(url, code).c_str());
   portRefresh(true);
 }
 
-void uiShowConfigQr(const String& url) {
+void uiShowConfigQr(const String& url, const String& code) {
   lv_obj_t* s = uiNewScreen();
   uiLabel(s, T("Settings"), &font_ui_32, 20, 20);
   wrapLabel(s, T("Scan to open the settings page:"), &font_ui_16, 20, 100, 440);
-  uiLabel(s, url.c_str(), &font_ui_24, 20, 180);
-  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, 230);
-  uiQR(s, 500, 60, 280, url.c_str());
+  int next = uiShowAddressAndCode(s, 20, 170, url, code);
+  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, next);
+  uiQR(s, 500, 60, 280, uiConfigLink(url, code).c_str());
   wrapLabel(s, T("Hold the green button for 3 s to erase the WiFi"), &font_ui_16, 20, 400, 760);
   wrapLabel(s, T("Press any button to close"), &font_ui_16, 20, 432, 760);
   portRefresh(true);

@@ -55,6 +55,23 @@ class WebServer {
       req.append(buf, n);
     }
     std::string head = req.substr(0, he), lower = head;
+    reqHeaders_.clear();
+    {
+      size_t pos = head.find("\r\n");
+      while (pos != std::string::npos && pos < head.size()) {
+        size_t eol = head.find("\r\n", pos + 2);
+        std::string line = head.substr(pos + 2, eol == std::string::npos ? std::string::npos : eol - pos - 2);
+        size_t colon = line.find(':');
+        if (colon != std::string::npos) {
+          std::string v = line.substr(colon + 1);
+          v.erase(0, v.find_first_not_of(" \t"));
+          std::string k = line.substr(0, colon);
+          for (auto& ch : k) ch = tolower(ch);
+          reqHeaders_[k] = v;
+        }
+        pos = eol;
+      }
+    }
     for (auto& ch : lower) ch = tolower(ch);
     size_t cl = lower.find("content-length:");
     size_t len = cl == std::string::npos ? 0 : (size_t)atoi(head.c_str() + cl + 15);
@@ -89,9 +106,28 @@ class WebServer {
     return it == args_.end() ? String() : String(it->second);
   }
   bool hasArg(const char* name) { return args_.count(name) > 0; }
+  // Like the ESP32 WebServer, request headers are only kept when asked for with collectHeaders().
+  void collectHeaders(const char* keys[], size_t n) {
+    wanted_.clear();
+    for (size_t i = 0; i < n; i++) {
+      std::string k = keys[i];
+      for (auto& ch : k) ch = tolower(ch);
+      wanted_.push_back(k);
+    }
+  }
+  String header(const char* name) {
+    std::string k = name;
+    for (auto& ch : k) ch = tolower(ch);
+    for (auto& w : wanted_)
+      if (w == k) {
+        auto it = reqHeaders_.find(k);
+        return it == reqHeaders_.end() ? String() : String(it->second);
+      }
+    return String();
+  }
   void sendHeader(const char* n, const String& v) { hdrs_ += std::string(n) + ": " + v + "\r\n"; }
   void send(int code, const char* type, const String& body) {
-    const char* text = code == 200 ? "OK" : code == 303 ? "See Other" : code == 400 ? "Bad Request" : "Not Found";
+    const char* text = code == 200 ? "OK" : code == 303 ? "See Other" : code == 400 ? "Bad Request" : code == 401 ? "Unauthorized" : code == 403 ? "Forbidden" : code == 429 ? "Too Many Requests" : "Not Found";
     std::string r = "HTTP/1.1 " + std::to_string(code) + " " + text + "\r\nContent-Type: " + type +
                     "\r\nContent-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n" +
                     hdrs_ + "\r\n" + body;
@@ -105,7 +141,8 @@ class WebServer {
  private:
   struct Route { std::string uri; HTTPMethod method; THandlerFunction fn; };
   std::vector<Route> routes_;
-  std::map<std::string, std::string> args_;
+  std::map<std::string, std::string> args_, reqHeaders_;
+  std::vector<std::string> wanted_;
   std::string hdrs_;
   int port_, fd_ = -1, cur_ = -1;
 

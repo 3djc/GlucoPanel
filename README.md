@@ -23,14 +23,14 @@ Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800�
 2. **Saved WiFi can't be joined.** The screen asks whether to erase it:
    - **KEY0 (green):** erase the credentials and go to setup.
    - **KEY1:** retry. With no key pressed it retries by itself after 60 s.
-3. **No WiFi saved (or erased).** The panel opens an open hotspot named **`GlucoPanel`** with a captive portal. The screen shows two QR codes: one joins the hotspot, one opens `http://192.168.4.1`.
+3. **No WiFi saved (or erased).** The panel opens a hotspot named **`GlucoPanel`** with a captive portal. The hotspot is protected (WPA2) by a random password made on first use and kept in flash; the screen shows it as text and inside the first QR code, which joins the hotspot when scanned. The second QR code opens `http://192.168.4.1`.
 4. **Connected.** The screen shows the SSID, the IP and a QR code for the settings page, which is also at `http://glucopanel.local`.
 
 ### Buttons
 
 On the dashboard the green button (KEY0) does two things:
 
-- **Short press:** shows a screen with a QR code and the address of the settings page. It closes after 60 s or when you press any button.
+- **Short press:** shows a screen with a QR code, the address of the settings page and a new 6-digit code (see below). It closes after 60 s or when you press any button.
 - **Hold for 3 s:** erases the saved WiFi and restarts in setup mode (the hotspot described above). This also works while the QR screen is up.
 
 The buttons are only read once the panel is running; the boot-time WiFi prompt above uses KEY0 and KEY1 as described.
@@ -45,6 +45,7 @@ Open the address shown on the display from any device on the same network.
 | Display unit | mg/dL or mmol/L |
 | Block contents | What each of the seven blocks shows (see below) |
 | HbA1c unit | % (NGSP, default) or mmol/mol (IFCC) for the estimated HbA1c block |
+| Check server certificates | Yes (default): HTTPS servers must present a certificate signed by a known authority. No: accept any certificate (insecure) |
 | Language | English (default), Français, Deutsch, Italiano or Español: the panel screens, the fetch errors and this page |
 | Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
@@ -66,7 +67,9 @@ Deltas are in the chosen unit and show `--` until enough history is known; histo
 
 Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
-**Security:** the page has no login and secrets are stored unencrypted. Only use it on a network you trust.
+**Access to the settings page.** The page needs a 6-digit **code that only the panel shows**: under the address on the "WiFi connected" and "Not configured" screens, and on the screen opened by a short press of the green button (a new code is made each time). The QR codes on those screens contain the code, so scanning one opens the page directly; otherwise open the address and type the code. A correct code starts a session (a cookie, 30 minutes after the last request); five wrong codes lock the page for a minute. Changing settings or erasing the WiFi therefore takes someone who can see the panel. The code is also printed on the serial console.
+
+What this does **not** do: the page is still plain HTTP, so someone who can read your WiFi traffic can see the code and the session cookie; and secrets (the WiFi password, the service credentials) are stored unencrypted in the ESP32's flash, readable by someone with physical access and a cable. Flash encryption would fix the latter, but it is irreversible and makes development harder, so it is not used.
 
 ## ePaper refresh policy
 
@@ -88,7 +91,7 @@ The sim logs every refresh (`epaper: FULL refresh` / `partial refresh`) so you c
 
 LibreLinkUp and Dexcom Share are unofficial APIs and can change without notice. Sessions are cached and renewed on expiry. The clock is set over NTP because reading ages need it.
 
-**Security:** HTTPS is used but the device does **not verify server certificates** (no CA bundle is embedded), so a hostile network could intercept your credentials. Pinning or bundling CA certificates would fix this.
+**Server certificates.** HTTPS connections are checked against the root certificate list that is part of the ESP32 SDK (the Mozilla list, about 68 KB, already in the firmware), so a hostile network cannot pose as Dexcom, LibreLinkUp or your Nightscout and read your credentials. Certificates have validity dates, so this needs the clock to be right; the panel waits for NTP before the first fetch. I checked that Dexcom Share and all LibreLinkUp regions chain to roots that are in that list (GTS Root R4 / GlobalSign Root CA); I could not test the check on a real device. If your Nightscout runs on its own server with a **self-signed certificate**, set "Check server certificates" to No in the settings (this disables the check for every service, so prefer a normal certificate, or plain `http://` on a network you trust). A failed check shows as a fetch error such as "X509 - Certificate verification failed".
 
 ## Build and flash
 

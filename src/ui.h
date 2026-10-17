@@ -26,16 +26,22 @@ lv_obj_t* uiNewScreen();
 // A black label at (x, y) of `parent`. If `width` > 0 the label is that wide, centred and clipped.
 lv_obj_t* uiLabel(lv_obj_t* parent, const char* text, const lv_font_t* font, int x, int y, int width = 0);
 
+// The settings page needs the code shown next to its address (see config_server.cpp); the QR codes
+// carry it: "http://<ip>/?k=<code>".
+String uiConfigLink(const String& url, const String& code);
+// The address in `y` and, below it, "Code: 123456" in a bigger font. Returns the y of the next free line.
+int uiShowAddressAndCode(lv_obj_t* parent, int x, int y, const String& url, const String& code);
+
 // A QR code of about `size` px with its top-left corner at (x, y), including a white quiet zone.
 lv_obj_t* uiQR(lv_obj_t* parent, int x, int y, int size, const char* text);
 
 // ---- WiFi screens (each one replaces the whole display and does a full refresh) ----
 void uiShowErasePrompt(const String& ssid);
-void uiShowPortal();  // hotspot + captive portal: QR codes to join and to open the setup page
-void uiShowConnected(const String& ssid, const String& ip, const String& url);
+void uiShowPortal(const String& hotspotPassword);  // hotspot + captive portal: QR codes to join (WPA password) and to open the setup page
+void uiShowConnected(const String& ssid, const String& ip, const String& url, const String& code);
 void uiShowWifiFailed();
 
 // Settings screen opened by a short press of the green button: QR code and address of the settings page.
-void uiShowConfigQr(const String& url);
+void uiShowConfigQr(const String& url, const String& code);
 // Shown after a long press, just before the saved WiFi is erased and the panel restarts in setup mode.
 void uiShowWifiErased();

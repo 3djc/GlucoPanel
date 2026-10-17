@@ -57,7 +57,8 @@ static void handleButtons() {
   } else if (g == PRESS_SHORT && online) {
     configShown = true;
     configSince = millis();
-    dashboardShowConfig("http://" + WiFi.localIP().toString());
+    Serial.printf("settings code: %s\n", configServerNewCode().c_str());  // a fresh code each time the screen opens
+    dashboardShowConfig("http://" + WiFi.localIP().toString(), configServerCode());
   }
 }
 
@@ -75,7 +76,7 @@ static void refresh() {
     lastError = r.error;
   }
   deltas = glucoseDeltas(lastGood);
-  drawDashboard(lastGood, deltas, lastError, r.notConfigured, "http://" + WiFi.localIP().toString());
+  drawDashboard(lastGood, deltas, lastError, r.notConfigured, "http://" + WiFi.localIP().toString(), configServerCode());
 
   unsigned long wait = (unsigned long)refreshMinutes() * 60000UL;
   if (!r.ok) {
@@ -101,6 +102,7 @@ void setup() {
   if (online) {
     glucoseInit();
     configServerBegin();
+    Serial.printf("settings code: %s\n", configServerCode().c_str());
   }
 }
 

@@ -17,6 +17,11 @@ class String : public std::string {
   String(float v) : std::string(std::to_string(v)) {}
   const char* c_str() const { return std::string::c_str(); }
   int length() const { return (int)size(); }
+  int indexOf(const char* s) const {
+    size_t p = find(s);
+    return p == npos ? -1 : (int)p;
+  }
+  int indexOf(const String& s) const { return indexOf(s.c_str()); }
   bool startsWith(const char* p) const { return rfind(p, 0) == 0; }
   bool endsWith(const char* p) const {
     size_t n = strlen(p);

@@ -28,7 +28,7 @@ lv_obj_t* errorLabel = nullptr;
 // What is currently on the panel.
 struct Shown {
   Mode mode = MODE_NONE;
-  String name, url, error, layout;
+  String name, url, code, error, layout;
 } shown;
 CellView view;
 
@@ -36,7 +36,7 @@ CellView view;
 struct LastArgs {
   Reading last;
   Deltas d;
-  String error, url;
+  String error, url, code;
   bool notConfigured = false, have = false;
 } lastArgs;
 bool overlay = false;  // the settings screen is up
@@ -117,8 +117,8 @@ void buildReadingScreen() {
 // ---------- public ----------
 
 void drawDashboard(const Reading& last, const Deltas& d, const String& error,
-                   bool notConfigured, const String& configUrl) {
-  lastArgs = {last, d, error, configUrl, notConfigured, true};
+                   bool notConfigured, const String& configUrl, const String& configCode) {
+  lastArgs = {last, d, error, configUrl, configCode, notConfigured, true};
   if (overlay) return;
   Mode mode = notConfigured ? MODE_NOT_CONFIGURED : last.valid ? MODE_READING : MODE_NO_DATA;
   String name = sourceName();
@@ -137,7 +137,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
     setError(error);
     portRefresh(false);  // refreshes only if something was redrawn
   } else {
-    bool urlChanged = mode == MODE_NOT_CONFIGURED && configUrl != shown.url;
+    bool urlChanged = mode == MODE_NOT_CONFIGURED && (configUrl != shown.url || configCode != shown.code);
     bool nameChanged = mode != MODE_READING && name != shown.name;
     bool errorChanged = error != shown.error;
     if (!layoutChanged && !errorChanged && !urlChanged && !nameChanged) return;
@@ -152,8 +152,8 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
         uiLabel(s, T("Not configured"), &font_ui_32, 20, 100);
         uiLabel(s, T("Open this page to choose your"), &font_ui_16, 20, 160);
         uiLabel(s, T("glucose data source:"), &font_ui_16, 20, 190);
-        uiLabel(s, configUrl.c_str(), &font_ui_24, 20, 240);
-        uiQR(s, 500, 60, 280, configUrl.c_str());
+        uiShowAddressAndCode(s, 20, 240, configUrl, configCode);
+        uiQR(s, 500, 60, 280, uiConfigLink(configUrl, configCode).c_str());
       } else {
         uiLabel(s, T("No data yet"), &font_ui_32, 20, 100);
         if (error.length()) uiLabel(s, ("! " + error).c_str(), &font_ui_16, 20, 440);
@@ -165,20 +165,23 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
   shown.mode = mode;
   shown.name = name;
   shown.url = configUrl;
+  shown.code = configCode;
   shown.error = error;
   shown.layout = layout;
 }
 
-void dashboardShowConfig(const String& url) {
+void dashboardShowConfig(const String& url, const String& code) {
   overlay = true;
-  uiShowConfigQr(url);
+  lastArgs.url = url;  // the dashboard is redrawn with the new code when this screen closes
+  lastArgs.code = code;
+  uiShowConfigQr(url, code);
 }
 
 void dashboardHideConfig() {
   if (!overlay) return;
   overlay = false;
   shown.mode = MODE_NONE;  // the dashboard widgets are gone: rebuild
-  if (lastArgs.have) drawDashboard(lastArgs.last, lastArgs.d, lastArgs.error, lastArgs.notConfigured, lastArgs.url);
+  if (lastArgs.have) drawDashboard(lastArgs.last, lastArgs.d, lastArgs.error, lastArgs.notConfigured, lastArgs.url, lastArgs.code);
 }
 
 void dashboardTick() {

@@ -1,6 +1,7 @@
 // Simulator HTTP client (libcurl). With SIM_API_BASE=http://localhost:9000 every request is sent
 // to that base instead (path kept, original host passed in X-Orig-Host) -- see tools/mock_cgm.py.
 #include <curl/curl.h>
+#include "config.h"
 #include "http.h"
 
 static size_t onData(char* p, size_t s, size_t n, void* u) {
@@ -33,6 +34,10 @@ HttpResponse httpRequest(const char* method, const String& url0, const String& b
   curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, onData);
   curl_easy_setopt(c, CURLOPT_WRITEDATA, &out);
   curl_easy_setopt(c, CURLOPT_TIMEOUT, 15L);
+  if (cfgGet("tls_verify") == "off") {  // like the device: "Check server certificates" = No
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYHOST, 0L);
+  }
   CURLcode rc = curl_easy_perform(c);
   long code = 0;
   curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &code);

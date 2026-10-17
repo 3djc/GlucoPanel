@@ -14,7 +14,7 @@ class WiFiManager {
   bool getWiFiIsSaved() { return sim_wifi_saved; }
   String getWiFiSSID() { return "HomeNetwork"; }
   void resetSettings() { sim_wifi_saved = false; }
-  bool autoConnect(const char*) {
+  bool autoConnect(const char*, const char* = nullptr) {
     if (cb_) cb_(this);
     return sim_wifi_connected = sim_wait_enter();
   }
