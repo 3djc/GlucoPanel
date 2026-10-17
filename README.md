@@ -21,7 +21,7 @@ Open the address shown on the display from any device on the same network.
 | --- | --- |
 | Data source | Nightscout (URL, optional token), LibreLinkUp (email, password, region) or Dexcom Share (username, password, server) |
 | Display unit | mg/dL or mmol/L |
-| Time zone | Used for the HH:MM reading time on the dashboard (default Paris / Berlin / Madrid) |
+| Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
@@ -30,7 +30,7 @@ The panel then shows the dashboard and refetches on a timer. The screen is laid 
 | | | |
 | --- | --- | --- |
 | trend arrow | change vs the previous reading | change vs 15 min ago |
-| time of the reading (HH:MM) | **glucose value** | freshness bar (one segment per minute of age, up to 5) |
+| date (DD Mon) above clock (HH:MM), local time | **glucose value** | freshness bar (one segment per minute of age, up to 5) |
 | _(empty)_ | _(empty)_ | _(empty)_ |
 
 Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (Dexcom 30 min, Nightscout 30 entries, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). A thin strip at the very bottom shows the reading's age (left) and the last fetch error. The low/high thresholds are stored but not used on screen yet. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.

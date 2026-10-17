@@ -30,11 +30,12 @@ struct Shown {
   Deltas deltas;
   int ageMins = -1;  // freshness level (see ageLevel)
   time_t when = 0;
+  long clockMin = -1;  // minute (since epoch) of the clock label
 } shown;
 
 // Widgets of the reading screen, valid while shown.mode == MODE_READING.
 struct Widgets {
-  lv_obj_t *band, *arrow, *arrowUnknown, *delta1, *delta15, *value, *unit, *time, *error;
+  lv_obj_t *band, *arrow, *arrowUnknown, *delta1, *delta15, *value, *unit, *date, *time, *error;
   lv_obj_t* seg[SEGMENTS];  // freshness bar
 } w;
 Trend arrowTrend = TREND_UNKNOWN;
@@ -141,8 +142,10 @@ void setValue(int mgdl, bool mmol) {
   lv_label_set_text(w.unit, mmol ? "mmol/L" : "mg/dL");
 }
 
-// Local time (HH:MM) of the reading, in the time zone chosen in the settings.
-void setTime(time_t when) {
+// Current local time (HH:MM) and date (DD Mon), in the time zone chosen in the settings.
+void setClock() {
+  time_t now = time(nullptr);
+  shown.clockMin = now / 60;
   static String applied;
   String tz = cfgGet("tz");
   if (tz != applied) {
@@ -151,10 +154,13 @@ void setTime(time_t when) {
     applied = tz;
   }
   struct tm t;
-  localtime_r(&when, &t);
-  char buf[8];
+  localtime_r(&now, &t);
+  // a label is only touched when its text changes, so the date refreshes once a day, not every minute
+  char buf[16];
   strftime(buf, sizeof(buf), "%H:%M", &t);
-  lv_label_set_text(w.time, buf);
+  if (strcmp(buf, lv_label_get_text(w.time))) lv_label_set_text(w.time, buf);
+  strftime(buf, sizeof(buf), "%d %b", &t);
+  if (strcmp(buf, lv_label_get_text(w.date))) lv_label_set_text(w.date, buf);
 }
 
 void setDeltas(const Deltas& d, bool mmol) {
@@ -200,9 +206,13 @@ void buildReadingScreen() {
   w.delta1 = uiLabel(w.band, "", &lv_font_montserrat_48, CELL_W, 44, CELL_W);
   w.delta15 = uiLabel(w.band, "", &lv_font_montserrat_48, 2 * CELL_W, 44, CELL_W);
 
-  // reading time, in the block left of the value, vertically centred on the digits
-  const int DIGITS_MID = 232;  // (187 + 277) / 2, measured on the rendered screen
-  w.time = uiLabel(scr, "", &lv_font_montserrat_48, 0, DIGITS_MID - lv_font_get_line_height(&lv_font_montserrat_48) / 2,
+  // date and clock, in the block left of the value, vertically centred on the digits
+  // Measured on the rendered screen: the value + unit ink spans y=187..327 (centre 257); this offset puts
+  // the date + time ink (about 13 px above DIGITS_MID) on that centre.
+  const int DIGITS_MID = 270;
+  const int timeTop = DIGITS_MID - lv_font_get_line_height(&lv_font_montserrat_48) / 2;
+  w.time = uiLabel(scr, "", &lv_font_montserrat_48, 0, timeTop, SCREEN_W / COLS);
+  w.date = uiLabel(scr, "", &lv_font_montserrat_24, 0, timeTop - lv_font_get_line_height(&lv_font_montserrat_24) + 6,
                    SCREEN_W / COLS);
 
   w.value = uiLabel(scr, "", &font_big_128, 0, 0, SCREEN_W);
@@ -260,7 +270,6 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       setValue(last.mgdl, mmol);
       changed = true;
     }
-    if (all) setTime(last.when);
     if (mins != shown.ageMins || errorChanged) {
       setStrip(mins, error);
       changed = true;
@@ -276,7 +285,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       setArrow(last.trend);
       setDeltas(d, mmol);
       setValue(last.mgdl, mmol);
-      setTime(last.when);
+      setClock();
       setStrip(mins, error);
     } else {
       lv_obj_t* s = uiNewScreen();
@@ -313,9 +322,16 @@ void dashboardTick() {
   if (millis() - lastCheck < 1000) return;
   lastCheck = millis();
 
+  bool changed = false;
   int mins = ageLevel(ageMinutes(shown.when));
-  if (mins == shown.ageMins) return;
-  shown.ageMins = mins;
-  setStrip(mins, shown.error);
-  portRefresh(false);
+  if (mins != shown.ageMins) {
+    shown.ageMins = mins;
+    setStrip(mins, shown.error);
+    changed = true;
+  }
+  if (time(nullptr) / 60 != shown.clockMin) {  // the clock label ticks once a minute
+    setClock();
+    changed = true;
+  }
+  if (changed) portRefresh(false);
 }
