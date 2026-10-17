@@ -6,6 +6,17 @@ Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800Ã
 
 > **Status:** WiFi onboarding, the settings page, glucose fetching (Nightscout, LibreLinkUp, Dexcom Share), the dashboard and the simulator are implemented. The fetchers are tested against a mock server only; they have not been run against the real services or on the device.
 
+## Medical disclaimer
+
+**GlucoPanel is not a medical device.** It is a hobby project that shows glucose readings fetched from third-party services, and it has not been tested, certified or approved for any medical use.
+
+- **Do not use it to make treatment decisions**, such as insulin dosing or deciding what to eat. Always use your official sensor, reader or app, and its alarms.
+- The displayed values can be delayed, wrong, stale or missing: the data comes through unofficial, undocumented APIs that can change or stop working without notice, over a network that can fail, and the panel can crash, lose power or freeze on an old reading. The reading's age is shown for that reason, but check it.
+- The statistics (average, time in range, variability) and the **estimated HbA1c** are computed from the readings the panel happened to collect, with gaps; the HbA1c is an estimate (GMI) that can differ from a laboratory result by 0.5 % or more.
+- The panel is not a replacement for medical advice. Talk to your healthcare team about your treatment.
+- This project is not affiliated with or endorsed by Dexcom, Abbott (FreeStyle Libre / LibreLinkUp), Nightscout or Seeed Studio. The names are used only to say which services it can read.
+- It is provided "as is", with no warranty of any kind; see the licence below.
+
 ## How it works
 
 1. **Boot.** The panel tries the saved WiFi (up to 20 s).
@@ -166,3 +177,9 @@ tools/
 - `src/font_big_96.c` and `src/font_big_128.c` were generated from Montserrat Medium (SIL OFL) with `lv_font_conv --size 128 --bpp 4 --no-compress --format lvgl --symbols "0123456789.-+"`. Regenerate them the same way to change the size.
 - **Languages.** The English text is the key of the translation table in `src/i18n.cpp`: `T("vs last")` returns the text in the chosen language, or the English text if there is no entry. To add a string, use `T()` where it is shown and add a row (fr, de, it, es) to the table; to add a language, add a column, a `Lang` value, a month row and an option in the `lang` field of `src/config.cpp`. Translations may only use ASCII and Latin-1 characters (accents of fr/de/it/es): that is what `font_ui_*.c` contains. For other scripts regenerate the fonts with more ranges, or with `--symbols`. The language is stored in flash like the other settings, so the WiFi screens at boot already use it (the very first boot is in English). Translations were written without a native-speaker review, corrections are welcome.
 - `font_ui_14/16/24/32.c` were generated with `lv_font_conv --size N --bpp 4 --no-compress --format lvgl -r 0x20-0x7F -r 0xA0-0xFF` from Montserrat Medium (SIL OFL); `font_ui_48.c` has the ASCII range only because it only shows numbers.
+
+## License
+
+Copyright 2026 3djc. Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may use, modify and share it for any **noncommercial** purpose, which includes personal use, hobby projects, research, education and use by charities and similar organizations. **Commercial use is not permitted** without a separate agreement with the copyright holder. Because of that restriction this is "source-available", not "open source" in the sense of the OSI definition.
+
+Bundled third-party material keeps its own terms: LVGL, ArduinoJson and WiFiManager (MIT), Seeed_GFX (see its repository) and the Montserrat font used for the generated `font_*.c` files (SIL Open Font License 1.1). These are downloaded by PlatformIO at build time, except for the generated fonts that are part of this repository.
