@@ -16,6 +16,10 @@ enum CellType {
   CELL_READTIME,   // time the reading was taken
   CELL_AGE,        // how old the reading is, in minutes
   CELL_FRESH,      // freshness bar: one segment per minute of age, up to 5
+  CELL_AVG,        // average glucose over the collected history (up to 24 h)
+  CELL_TIR,        // time in range (between the low and high limits), with time below / above
+  CELL_RANGE,      // lowest and highest reading
+  CELL_CV,         // glucose variability: coefficient of variation, with the standard deviation
   CELL_GRAPH,      // glucose graph (bottom block)
 };
 
@@ -26,6 +30,7 @@ struct CellView {
   Reading last;
   Deltas deltas;
   bool mmol = false;
+  int low = 70, high = 180;  // limits in mg/dL, for the statistics
 };
 
 struct Cell {

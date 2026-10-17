@@ -114,6 +114,8 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
   view.last = last;
   view.deltas = d;
   view.mmol = cfgGet("unit") == "mmol";
+  view.low = atoi(cfgGet("low").c_str());
+  view.high = atoi(cfgGet("high").c_str());
 
   bool layoutChanged = shown.mode == MODE_NONE || mode != shown.mode || layout != shown.layout;
 

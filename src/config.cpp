@@ -4,7 +4,8 @@
 // What a dashboard block can show (see cells.h).
 #define BLOCK_OPTIONS \
   "none:Empty|value:Glucose value|arrow:Trend arrow|delta1:Change vs last reading|delta15:Change vs 15 min ago|" \
-  "clock:Date and time|readtime:Time of the reading|age:Age of the reading|fresh:Freshness bar"
+  "clock:Date and time|readtime:Time of the reading|age:Age of the reading|fresh:Freshness bar|" \
+  "avg:Average glucose|tir:Time in range|range:Lowest and highest|cv:Variability (CV)"
 
 const ConfigField CONFIG_FIELDS[] = {
   {"source", "Data source", "select", "", "nightscout:Nightscout|libre:LibreLinkUp|dexcom:Dexcom Share", "nightscout"},

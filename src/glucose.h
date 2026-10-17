@@ -34,6 +34,23 @@ Deltas glucoseDeltas(const Reading& latest);
 #define GRAPH_HOURS 3
 #endif
 
+// How much history is kept for the statistics blocks. Dexcom Share only returns its last ~16 h in one
+// request, so the rest builds up while the panel runs.
+#ifndef STATS_HOURS
+#define STATS_HOURS 24
+#endif
+
+// Statistics over the collected readings (up to STATS_HOURS back from the newest one). Averages are
+// time-weighted so that a source with mixed 1 min and 15 min points is not biased to the recent ones.
+struct Stats {
+  bool ok = false;     // false until there is at least half an hour of readings
+  int hours = 0;       // how much history the numbers cover (rounded)
+  float avg = 0, sd = 0;
+  int minMgdl = 0, maxMgdl = 0;
+  float belowPct = 0, inRangePct = 0, abovePct = 0;  // against the low/high limits (mg/dL)
+};
+Stats glucoseStats(int low, int high);
+
 // Copies the newest `max` collected readings (ascending by time) into `out`; returns how many.
 int glucoseHistory(Reading* out, int max);
 

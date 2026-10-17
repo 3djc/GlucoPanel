@@ -126,7 +126,7 @@ static Trend trendFromLibreArrow(int n) {  // 1 = SingleDown ... 5 = SingleUp
 // ---------- reading history (for the deltas and the graph) ----------
 
 // Libre only reports the latest value each minute, so ~1 point/min can pile up over the graph window.
-static const int HIST_MAX = GRAPH_HOURS * 60 + 60;
+static const int HIST_MAX = STATS_HOURS * 60 + 60;
 static Reading hist[HIST_MAX];  // ascending by time
 static int histN = 0;
 
@@ -152,6 +152,49 @@ int glucoseHistory(Reading* out, int max) {
   int n = histN < max ? histN : max;
   for (int i = 0; i < n; i++) out[i] = hist[histN - n + i];  // the newest n, ascending
   return n;
+}
+
+Stats glucoseStats(int low, int high) {
+  Stats st;
+  if (histN < 2) return st;
+  const time_t end = hist[histN - 1].when, from = end - (time_t)STATS_HOURS * 3600;
+  int first = 0;
+  while (first < histN && hist[first].when < from) first++;
+  if (end - hist[first].when < 30 * 60) return st;
+  double wsum = 0, mean = 0, m2 = 0, below = 0, above = 0;
+  st.minMgdl = 1000;
+  for (int i = first; i < histN; i++) {
+    int v = hist[i].mgdl;
+    time_t dt = i + 1 < histN ? hist[i + 1].when - hist[i].when : 300;  // each reading holds until the next
+    if (dt > 900) dt = 900;                                              // but never across a long gap
+    if (dt <= 0) continue;
+    double w = (double)dt, nw = wsum + w, delta = v - mean;
+    mean += delta * w / nw;  // weighted running mean / variance
+    m2 += w * delta * (v - mean);
+    wsum = nw;
+    if (v < low) below += w;
+    if (v > high) above += w;
+    st.minMgdl = v < st.minMgdl ? v : st.minMgdl;
+    st.maxMgdl = v > st.maxMgdl ? v : st.maxMgdl;
+  }
+  if (wsum <= 0) return st;
+  st.ok = true;
+  st.hours = (int)((end - hist[first].when + 1800) / 3600);
+  st.avg = (float)mean;
+  st.sd = (float)sqrt(m2 / wsum);
+  st.belowPct = (float)(100.0 * below / wsum);
+  st.abovePct = (float)(100.0 * above / wsum);
+  st.inRangePct = 100.0f - st.belowPct - st.abovePct;
+  return st;
+}
+
+// How far back the next fetch has to reach: everything on the first one (or while the clock is not set),
+// afterwards only what is newer than the newest reading we have, so a fetch stays small.
+static int fetchWindowMinutes() {
+  time_t now = time(nullptr);
+  if (histN == 0 || now < 1600000000) return STATS_HOURS * 60;
+  int mins = (int)((now - hist[histN - 1].when) / 60) + 10;
+  return mins < 30 ? 30 : mins > STATS_HOURS * 60 ? STATS_HOURS * 60 : mins;
 }
 
 static time_t historySpan() { return histN ? hist[histN - 1].when - hist[0].when : 0; }
@@ -181,7 +224,7 @@ Deltas glucoseDeltas(const Reading& latest) {
 static FetchResult fetchNightscout() {
   String base = cfgGet("ns_url");
   if (!base.length()) { FetchResult r; r.notConfigured = true; r.error = "Nightscout URL not set"; return r; }
-  String url = base + "/api/v1/entries/sgv.json?count=" + String(GRAPH_HOURS * 12 + 6);  // one reading per 5 min over the graph window
+  String url = base + "/api/v1/entries/sgv.json?count=" + String(fetchWindowMinutes() / 5 + 6);  // one reading per 5 min
   String tok = cfgGet("ns_token");
   if (tok.length()) url += "&token=" + urlEncode(tok);
 
@@ -268,7 +311,7 @@ static FetchResult fetchDexcom() {
     String error;
     if (!dexSession.length() && !dexLogin(error)) return fail(error);
     HttpResponse r = httpRequest("POST",
-        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=" + String(GRAPH_HOURS * 60 + 10) + "&maxCount=" + String(GRAPH_HOURS * 24 + 8),
+        dexBase() + "/Publisher/ReadPublisherLatestGlucoseValues?sessionId=" + dexSession + "&minutes=" + String(fetchWindowMinutes()) + "&maxCount=288",  // 288 is the most Share returns (~16 h)
         "", {{"Content-Type", "application/json"}, {"Accept", "application/json"}});
     if (r.status <= 0) return fail("Dexcom: " + r.error);
     String code = dexErrorCode(r.body);

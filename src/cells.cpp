@@ -103,6 +103,12 @@ void buildCaptioned(Cell& c, const char* caption) {
   c.a = label(c, &lv_font_montserrat_48, cy - 21);
 }
 
+// Like buildCaptioned, plus a small line under the number (c.c).
+void buildStat(Cell& c, const char* caption) {
+  buildCaptioned(c, caption);
+  c.c = label(c, &lv_font_montserrat_16, centreY(c) + 36);
+}
+
 void buildValue(Cell& c) {
   bool tall = c.h >= 150;
   int mid = c.y + c.h / 2;
@@ -215,13 +221,50 @@ void updateFresh(Cell& c, const CellView& v) {
   }
 }
 
+// ---------- statistics blocks ----------
+
+String mgdlText(float mgdl, bool mmol) {
+  char buf[16];
+  if (mmol) snprintf(buf, sizeof(buf), "%.1f", mgdl / 18.016f);
+  else snprintf(buf, sizeof(buf), "%d", (int)lroundf(mgdl));
+  return buf;
+}
+
+void updateStat(Cell& c, const CellView& v) {
+  Stats st = glucoseStats(v.low, v.high);
+  const char* name = c.type == CELL_AVG ? "average" : c.type == CELL_TIR ? "in range" : c.type == CELL_RANGE ? "lowest / highest" : "variability";
+  String caption = name;
+  String number = "--", sub;
+  if (st.ok) {
+    caption += " " + String(st.hours) + " h";
+    char buf[48];
+    switch (c.type) {
+      case CELL_AVG: number = mgdlText(st.avg, v.mmol); break;
+      case CELL_TIR:
+        snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(st.inRangePct));
+        number = buf;
+        snprintf(buf, sizeof(buf), "low %d%%   high %d%%", (int)lroundf(st.belowPct), (int)lroundf(st.abovePct));
+        sub = buf;
+        break;
+      case CELL_RANGE: number = mgdlText(st.minMgdl, v.mmol) + " - " + mgdlText(st.maxMgdl, v.mmol); break;
+      default:  // CELL_CV
+        snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(100.0f * st.sd / (st.avg > 0 ? st.avg : 1)));
+        number = buf;
+        sub = "SD " + mgdlText(st.sd, v.mmol);
+    }
+  }
+  setText(c.b, caption.c_str());
+  setText(c.a, number.c_str());
+  setText(c.c, sub.c_str());
+}
+
 }  // namespace
 
 CellType cellTypeFromString(const String& s) {
   static const struct { const char* name; CellType type; } table[] = {
       {"value", CELL_VALUE}, {"arrow", CELL_ARROW}, {"delta1", CELL_DELTA1}, {"delta15", CELL_DELTA15},
       {"clock", CELL_CLOCK}, {"readtime", CELL_READTIME}, {"age", CELL_AGE}, {"fresh", CELL_FRESH},
-      {"graph", CELL_GRAPH}};
+      {"avg", CELL_AVG}, {"tir", CELL_TIR}, {"range", CELL_RANGE}, {"cv", CELL_CV}, {"graph", CELL_GRAPH}};
   for (const auto& e : table)
     if (s == e.name) return e.type;
   return CELL_NONE;
@@ -240,6 +283,10 @@ void cellBuild(Cell& c) {
     case CELL_READTIME: buildCaptioned(c, "reading time"); break;
     case CELL_AGE: buildCaptioned(c, "reading age"); break;
     case CELL_FRESH: buildFresh(c); break;
+    case CELL_AVG: buildStat(c, ""); break;
+    case CELL_TIR: buildStat(c, ""); break;
+    case CELL_RANGE: buildStat(c, ""); break;
+    case CELL_CV: buildStat(c, ""); break;
     case CELL_GRAPH: c.a = graphCreate(c.parent, c.x, c.y, c.w, c.h); break;
     default: break;
   }
@@ -255,6 +302,10 @@ void cellUpdate(Cell& c, const CellView& v) {
     case CELL_READTIME: updateReadTime(c, v); break;
     case CELL_AGE: updateAge(c, v); break;
     case CELL_FRESH: updateFresh(c, v); break;
+    case CELL_AVG:
+    case CELL_TIR:
+    case CELL_RANGE:
+    case CELL_CV: updateStat(c, v); break;
     case CELL_GRAPH: {
       long stamp = (long)v.last.when * 2 + (v.mmol ? 1 : 0);  // the graph only changes with a new reading or unit
       if (stamp != c.stamp) {
