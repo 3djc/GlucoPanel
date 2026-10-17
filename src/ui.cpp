@@ -1,6 +1,7 @@
 #include "ui.h"
 #include <time.h>
 #include "config.h"
+#include "i18n.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"  // AP_NAME
 
@@ -52,40 +53,42 @@ lv_obj_t* uiQR(lv_obj_t* parent, int x, int y, int size, const char* text) {
 
 void uiShowErasePrompt(const String& ssid) {
   lv_obj_t* s = uiNewScreen();
-  uiLabel(s, "Cannot join WiFi", &lv_font_montserrat_32, 20, 20);
-  uiLabel(s, ("Saved network: " + ssid).c_str(), &lv_font_montserrat_16, 20, 80);
-  uiLabel(s, "Erase it and set up a new WiFi?", &lv_font_montserrat_16, 20, 130);
-  uiLabel(s, "KEY0 (green): ERASE and set up new WiFi", &lv_font_montserrat_16, 20, 200);
-  uiLabel(s, "KEY1: retry saved WiFi", &lv_font_montserrat_16, 20, 240);
-  uiLabel(s, "(retries automatically in 60 s)", &lv_font_montserrat_16, 20, 300);
+  uiLabel(s, T("Cannot join WiFi"), &font_ui_32, 20, 20);
+  uiLabel(s, (String(T("Saved network:")) + " " + ssid).c_str(), &font_ui_16, 20, 80);
+  uiLabel(s, T("Erase it and set up a new WiFi?"), &font_ui_16, 20, 130);
+  uiLabel(s, T("KEY0 (green): ERASE and set up new WiFi"), &font_ui_16, 20, 200);
+  uiLabel(s, T("KEY1: retry saved WiFi"), &font_ui_16, 20, 240);
+  uiLabel(s, T("(retries automatically in 60 s)"), &font_ui_16, 20, 300);
   portRefresh(true);
 }
 
 void uiShowPortal() {
   lv_obj_t* s = uiNewScreen();
-  uiLabel(s, "WiFi setup", &lv_font_montserrat_32, 20, 20);
-  uiLabel(s, "1. Join WiFi " AP_NAME, &lv_font_montserrat_16, 20, 70);
+  uiLabel(s, T("WiFi setup"), &font_ui_32, 20, 20);
+  char join[96];
+  snprintf(join, sizeof(join), T("1. Join WiFi %s"), AP_NAME);
+  uiLabel(s, join, &font_ui_16, 20, 70);
   uiQR(s, 56, 110, 280, "WIFI:T:nopass;S:" AP_NAME ";;");
-  uiLabel(s, "2. Open setup page", &lv_font_montserrat_16, 420, 70);
+  uiLabel(s, T("2. Open setup page"), &font_ui_16, 420, 70);
   uiQR(s, 456, 110, 280, "http://192.168.4.1");
-  uiLabel(s, "(or browse to 192.168.4.1)", &lv_font_montserrat_16, 420, 420);
+  uiLabel(s, T("(or browse to 192.168.4.1)"), &font_ui_16, 420, 420);
   portRefresh(true);
 }
 
 void uiShowConnected(const String& ssid, const String& ip, const String& url) {
   lv_obj_t* s = uiNewScreen();
-  uiLabel(s, "WiFi connected", &lv_font_montserrat_32, 20, 20);
-  uiLabel(s, ("SSID: " + ssid).c_str(), &lv_font_montserrat_16, 20, 70);
-  uiLabel(s, ("IP: " + ip).c_str(), &lv_font_montserrat_16, 20, 100);
-  uiLabel(s, "Configure the panel at:", &lv_font_montserrat_16, 20, 170);
-  uiLabel(s, url.c_str(), &lv_font_montserrat_24, 20, 200);
-  uiLabel(s, "or http://glucopanel.local", &lv_font_montserrat_16, 20, 240);
+  uiLabel(s, T("WiFi connected"), &font_ui_32, 20, 20);
+  uiLabel(s, ("SSID: " + ssid).c_str(), &font_ui_16, 20, 70);
+  uiLabel(s, ("IP: " + ip).c_str(), &font_ui_16, 20, 100);
+  uiLabel(s, T("Configure the panel at:"), &font_ui_16, 20, 170);
+  uiLabel(s, url.c_str(), &font_ui_24, 20, 200);
+  uiLabel(s, (String(T("or")) + " http://glucopanel.local").c_str(), &font_ui_16, 20, 240);
   uiQR(s, 500, 60, 280, url.c_str());
   portRefresh(true);
 }
 
 void uiShowWifiFailed() {
   lv_obj_t* s = uiNewScreen();
-  uiLabel(s, "WiFi setup failed", &lv_font_montserrat_32, 20, 20);
+  uiLabel(s, T("WiFi setup failed"), &font_ui_32, 20, 20);
   portRefresh(true);
 }

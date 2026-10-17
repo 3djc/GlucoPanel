@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string.h>
 #include "graph.h"
+#include "i18n.h"
 #include "ui.h"
 
 namespace {
@@ -98,15 +99,15 @@ void arrowDrawCb(lv_event_t* ev) {
 // A caption over a big number (the delta, reading time and age blocks).
 void buildCaptioned(Cell& c, const char* caption) {
   int cy = centreY(c);
-  c.b = label(c, &lv_font_montserrat_16, cy - 49);
+  c.b = label(c, &font_ui_16, cy - 49);
   lv_label_set_text(c.b, caption);
-  c.a = label(c, &lv_font_montserrat_48, cy - 21);
+  c.a = label(c, &font_ui_48, cy - 21);
 }
 
 // Like buildCaptioned, plus a small line under the number (c.c).
 void buildStat(Cell& c, const char* caption) {
   buildCaptioned(c, caption);
-  c.c = label(c, &lv_font_montserrat_16, centreY(c) + 36);
+  c.c = label(c, &font_ui_16, centreY(c) + 36);
 }
 
 void buildValue(Cell& c) {
@@ -114,8 +115,8 @@ void buildValue(Cell& c) {
   int mid = c.y + c.h / 2;
   c.a = label(c, &font_big_128, 0);
   lv_obj_set_y(c.a, mid + (tall ? -8 : -10) - lineHeight(&font_big_128) / 2);
-  c.b = label(c, &lv_font_montserrat_24, 0);
-  lv_obj_set_y(c.b, mid + (tall ? 74 : 44) - lineHeight(&lv_font_montserrat_24) / 2);
+  c.b = label(c, &font_ui_24, 0);
+  lv_obj_set_y(c.b, mid + (tall ? 74 : 44) - lineHeight(&font_ui_24) / 2);
 }
 
 void buildArrow(Cell& c) {
@@ -128,14 +129,14 @@ void buildArrow(Cell& c) {
   lv_obj_remove_flag(c.a, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_user_data(c.a, &c);
   lv_obj_add_event_cb(c.a, arrowDrawCb, LV_EVENT_DRAW_MAIN, nullptr);
-  c.b = uiLabel(c.parent, "?", &lv_font_montserrat_48, c.x, centreY(c) - lineHeight(&lv_font_montserrat_48) / 2, c.w);
+  c.b = uiLabel(c.parent, "?", &font_ui_48, c.x, centreY(c) - lineHeight(&font_ui_48) / 2, c.w);
 }
 
 void buildClock(Cell& c) {
   // Measured: the date + time ink is centred 13 px above the time label's centre.
-  int timeTop = centreY(c) + 13 - lineHeight(&lv_font_montserrat_48) / 2;
-  c.a = label(c, &lv_font_montserrat_48, timeTop);
-  c.b = label(c, &lv_font_montserrat_24, timeTop - lineHeight(&lv_font_montserrat_24) + 6);
+  int timeTop = centreY(c) + 13 - lineHeight(&font_ui_48) / 2;
+  c.a = label(c, &font_ui_48, timeTop);
+  c.b = label(c, &font_ui_24, timeTop - lineHeight(&font_ui_24) + 6);
 }
 
 // SEGMENTS stacked segments filling from the bottom, one per minute of age.
@@ -163,7 +164,7 @@ void updateValue(Cell& c, const CellView& v) {
   if (v.mmol) snprintf(buf, sizeof(buf), "%.1f", v.last.mgdl / 18.016);
   else snprintf(buf, sizeof(buf), "%d", v.last.mgdl);
   // biggest font that still fits the block
-  const lv_font_t* candidates[] = {&font_big_128, &font_big_96, &lv_font_montserrat_48};
+  const lv_font_t* candidates[] = {&font_big_128, &font_big_96, &font_ui_48};
   const lv_font_t* f = candidates[c.h >= 150 ? 0 : 1];
   for (int i = c.h >= 150 ? 0 : 1; i < 3; i++) {
     f = candidates[i];
@@ -192,8 +193,7 @@ void updateClock(Cell& c) {
   char buf[16];
   strftime(buf, sizeof(buf), "%H:%M", &t);
   setText(c.a, buf);
-  strftime(buf, sizeof(buf), "%d %b", &t);
-  setText(c.b, buf);
+  setText(c.b, i18nDate(t).c_str());
 }
 
 void updateReadTime(Cell& c, const CellView& v) {
@@ -208,7 +208,7 @@ void updateReadTime(Cell& c, const CellView& v) {
 void updateAge(Cell& c, const CellView& v) {
   int m = ageMinutes(v.last.when);
   char buf[16];
-  if (m < 60) snprintf(buf, sizeof(buf), "%d min", m);
+  if (m < 60) snprintf(buf, sizeof(buf), T("%d min"), m);
   else snprintf(buf, sizeof(buf), "%dh%02d", m / 60, m % 60);
   setText(c.a, buf);
 }
@@ -232,7 +232,7 @@ String mgdlText(float mgdl, bool mmol) {
 
 void updateStat(Cell& c, const CellView& v) {
   Stats st = glucoseStats(v.low, v.high);
-  const char* name = c.type == CELL_AVG ? "average" : c.type == CELL_TIR ? "in range" : c.type == CELL_RANGE ? "lowest / highest" : "variability";
+  const char* name = T(c.type == CELL_AVG ? "average" : c.type == CELL_TIR ? "in range" : c.type == CELL_RANGE ? "lowest / highest" : "variability");
   String caption = name;
   String number = "--", sub;
   if (st.ok) {
@@ -243,14 +243,14 @@ void updateStat(Cell& c, const CellView& v) {
       case CELL_TIR:
         snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(st.inRangePct));
         number = buf;
-        snprintf(buf, sizeof(buf), "low %d%%   high %d%%", (int)lroundf(st.belowPct), (int)lroundf(st.abovePct));
+        snprintf(buf, sizeof(buf), "%s %d%%   %s %d%%", T("low"), (int)lroundf(st.belowPct), T("high"), (int)lroundf(st.abovePct));
         sub = buf;
         break;
       case CELL_RANGE: number = mgdlText(st.minMgdl, v.mmol) + " - " + mgdlText(st.maxMgdl, v.mmol); break;
       default:  // CELL_CV
         snprintf(buf, sizeof(buf), "%d%%", (int)lroundf(100.0f * st.sd / (st.avg > 0 ? st.avg : 1)));
         number = buf;
-        sub = "SD " + mgdlText(st.sd, v.mmol);
+        sub = String(T("SD")) + " " + mgdlText(st.sd, v.mmol);
     }
   }
   setText(c.b, caption.c_str());
@@ -277,11 +277,11 @@ void cellBuild(Cell& c) {
   switch (c.type) {
     case CELL_VALUE: buildValue(c); break;
     case CELL_ARROW: buildArrow(c); break;
-    case CELL_DELTA1: buildCaptioned(c, "vs last"); break;
-    case CELL_DELTA15: buildCaptioned(c, "vs 15 min"); break;
+    case CELL_DELTA1: buildCaptioned(c, T("vs last")); break;
+    case CELL_DELTA15: buildCaptioned(c, T("vs 15 min")); break;
     case CELL_CLOCK: buildClock(c); break;
-    case CELL_READTIME: buildCaptioned(c, "reading time"); break;
-    case CELL_AGE: buildCaptioned(c, "reading age"); break;
+    case CELL_READTIME: buildCaptioned(c, T("reading time")); break;
+    case CELL_AGE: buildCaptioned(c, T("reading age")); break;
     case CELL_FRESH: buildFresh(c); break;
     case CELL_AVG: buildStat(c, ""); break;
     case CELL_TIR: buildStat(c, ""); break;

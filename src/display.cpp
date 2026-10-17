@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "cells.h"
 #include "config.h"
+#include "i18n.h"
 #include "lvgl_port.h"
 #include "ui.h"
 
@@ -33,7 +34,7 @@ CellView view;
 
 // Everything that needs the screen to be rebuilt when it changes.
 String layoutSignature() {
-  String sig = cfgGet("tz");
+  String sig = cfgGet("tz") + "|" + cfgGet("lang");
   for (int i = 0; i < N_CELLS; i++) sig += "|" + cfgGet(CELL_KEYS[i]);
   return sig;
 }
@@ -97,7 +98,7 @@ void buildReadingScreen() {
     cellBuild(c);
   }
 
-  errorLabel = uiLabel(scr, "", &lv_font_montserrat_16, 10, STRIP_Y);
+  errorLabel = uiLabel(scr, "", &font_ui_16, 10, STRIP_Y);
   lv_label_set_long_mode(errorLabel, LV_LABEL_LONG_CLIP);
   lv_obj_set_width(errorLabel, SCREEN_W - 20);
 }
@@ -134,16 +135,16 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       setError(error);
     } else {
       lv_obj_t* s = uiNewScreen();
-      uiLabel(s, name.c_str(), &lv_font_montserrat_32, 20, 20);
+      uiLabel(s, name.c_str(), &font_ui_32, 20, 20);
       if (mode == MODE_NOT_CONFIGURED) {
-        uiLabel(s, "Not configured", &lv_font_montserrat_32, 20, 100);
-        uiLabel(s, "Open this page to choose your", &lv_font_montserrat_16, 20, 160);
-        uiLabel(s, "glucose data source:", &lv_font_montserrat_16, 20, 190);
-        uiLabel(s, configUrl.c_str(), &lv_font_montserrat_24, 20, 240);
+        uiLabel(s, T("Not configured"), &font_ui_32, 20, 100);
+        uiLabel(s, T("Open this page to choose your"), &font_ui_16, 20, 160);
+        uiLabel(s, T("glucose data source:"), &font_ui_16, 20, 190);
+        uiLabel(s, configUrl.c_str(), &font_ui_24, 20, 240);
         uiQR(s, 500, 60, 280, configUrl.c_str());
       } else {
-        uiLabel(s, "No data yet", &lv_font_montserrat_32, 20, 100);
-        if (error.length()) uiLabel(s, ("! " + error).c_str(), &lv_font_montserrat_16, 20, 440);
+        uiLabel(s, T("No data yet"), &font_ui_32, 20, 100);
+        if (error.length()) uiLabel(s, ("! " + error).c_str(), &font_ui_16, 20, 440);
       }
     }
     portRefresh(true);

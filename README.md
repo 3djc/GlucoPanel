@@ -24,6 +24,7 @@ Open the address shown on the display from any device on the same network.
 | Data source | Nightscout (URL, optional token), LibreLinkUp (email, password, region) or Dexcom Share (username, password, server) |
 | Display unit | mg/dL or mmol/L |
 | Block contents | What each of the seven blocks shows (see below) |
+| Language | English (default), Français, Deutsch, Italiano or Español: the panel screens, the fetch errors and this page |
 | Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
@@ -130,9 +131,11 @@ src/
   lvgl_port.*       LVGL <-> ePaper glue: flush callback (black/white + dither), full/partial refresh policy
   ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
   graph.*           glucose graph widget (line, low/high band, hour ticks)
+  i18n.*            translation table (T("English text")), month names, language setting
   display.*         dashboard screen: mode switching, the grid of blocks
   cells.*           what a block can show (value, arrow, deltas, clock, age, freshness bar, graph)
   font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
+  font_ui_*.c       generated LVGL fonts for all other text (Montserrat Medium, ASCII + Latin-1)
   http.*            HTTP(S) client (device)
 sim/
   sim_main.cpp      SDL2 host and drawing
@@ -148,3 +151,5 @@ tools/
 - Button pins (GPIO 3 and 4, active low) come from the [Seeed Arduino peripherals cookbook](https://wiki.seeedstudio.com/reterminal_e10xx_with_arduino_peripherals/); confirm them on your board.
 - The UI is LVGL 9.5 (pinned in `platformio.ini`; 9.6 changed some APIs). LVGL renders to RGB565, `src/lvgl_port.cpp` thresholds each pixel to black/white and writes it to the panel framebuffer. Only `UI_GREY` is dithered.
 - `src/font_big_96.c` and `src/font_big_128.c` were generated from Montserrat Medium (SIL OFL) with `lv_font_conv --size 128 --bpp 4 --no-compress --format lvgl --symbols "0123456789.-+"`. Regenerate them the same way to change the size.
+- **Languages.** The English text is the key of the translation table in `src/i18n.cpp`: `T("vs last")` returns the text in the chosen language, or the English text if there is no entry. To add a string, use `T()` where it is shown and add a row (fr, de, it, es) to the table; to add a language, add a column, a `Lang` value, a month row and an option in the `lang` field of `src/config.cpp`. Translations may only use ASCII and Latin-1 characters (accents of fr/de/it/es): that is what `font_ui_*.c` contains. For other scripts regenerate the fonts with more ranges, or with `--symbols`. The language is stored in flash like the other settings, so the WiFi screens at boot already use it (the very first boot is in English). Translations were written without a native-speaker review, corrections are welcome.
+- `font_ui_14/16/24/32.c` were generated with `lv_font_conv --size N --bpp 4 --no-compress --format lvgl -r 0x20-0x7F -r 0xA0-0xFF` from Montserrat Medium (SIL OFL); `font_ui_48.c` has the ASCII range only because it only shows numbers.

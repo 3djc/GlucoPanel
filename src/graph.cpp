@@ -29,7 +29,7 @@ void drawLabel(lv_layer_t* layer, const char* text, const lv_area_t& area, lv_te
   lv_draw_label_dsc_init(&d);
   d.text = text;
   d.text_local = 1;  // drawing is deferred: LVGL keeps its own copy of the text
-  d.font = &lv_font_montserrat_14;
+  d.font = &font_ui_14;
   d.color = lv_color_black();
   d.align = align;
   lv_draw_label(layer, &d, &area);

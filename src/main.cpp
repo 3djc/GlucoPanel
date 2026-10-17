@@ -5,6 +5,7 @@
 #include "config_server.h"
 #include "display.h"
 #include "glucose.h"
+#include "i18n.h"
 #include "ui.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"
@@ -44,6 +45,7 @@ static void refresh() {
 
 void setup() {
   Serial.begin(115200);
+  i18nReload();  // the saved language applies from the first screen
   portBegin();
   online = wifiConnect();
   if (online) {

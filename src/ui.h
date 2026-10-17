@@ -6,6 +6,13 @@
 // this colour as a sparse dither pattern; every other colour is thresholded to black or white.
 #define UI_GREY lv_color_hex(0xE0E0E0)
 
+// UI text: Montserrat Medium, ASCII + Latin-1 (48 px: ASCII only, it only shows numbers).
+LV_FONT_DECLARE(font_ui_14);
+LV_FONT_DECLARE(font_ui_16);
+LV_FONT_DECLARE(font_ui_24);
+LV_FONT_DECLARE(font_ui_32);
+LV_FONT_DECLARE(font_ui_48);
+
 // Big digits for the glucose value (Montserrat Medium, digits and . - + only).
 LV_FONT_DECLARE(font_big_128);
 LV_FONT_DECLARE(font_big_96);

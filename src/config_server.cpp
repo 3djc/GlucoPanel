@@ -7,6 +7,8 @@
 #include <ESPmDNS.h>
 #include <WiFiManager.h>
 #include "config.h"
+#include "i18n.h"
+#include "wifi_setup.h"  // AP_NAME
 
 static WebServer server(80);
 static bool settingsChanged = false;
@@ -36,8 +38,8 @@ static bool nextOption(const char*& p, String& val, String& label) {
   return true;
 }
 
-static const char* PAGE_HEAD =
-  "<!doctype html><html><head><meta charset=utf-8>"
+static const char* PAGE_HEAD_B =
+  "<head><meta charset=utf-8>"
   "<meta name=viewport content='width=device-width,initial-scale=1'><title>GlucoPanel</title>"
   "<style>body{font:16px system-ui,sans-serif;max-width:30rem;margin:0 auto;padding:1rem}"
   "label{display:block;margin:.8rem 0 .2rem;font-weight:600}"
@@ -45,6 +47,31 @@ static const char* PAGE_HEAD =
   "button{margin-top:1rem;padding:.6rem 1rem;font:inherit}"
   ".ok{background:#d8f5d8;padding:.5rem}.err{background:#fbd8d8;padding:.5rem}"
   "hr{margin:2rem 0}.danger{color:#b00020}</style></head><body><h1>GlucoPanel</h1>";
+
+static String pageHead() { return String("<!doctype html><html lang=") + i18nCode() + ">" + PAGE_HEAD_B; }
+
+// Escapes a string for a single-quoted JavaScript string.
+static String jsq(const char* s) {
+  String o;
+  for (; *s; s++) {
+    if (*s == '\'' || *s == '\\') o += '\\';
+    o += *s;
+  }
+  return o;
+}
+
+// The texts the layout editor script needs, in the page language.
+static String editorTexts() {
+  struct tm sample = {};
+  sample.tm_mday = 17;
+  sample.tm_mon = 9;
+  String d = i18nDate(sample);
+  return String("const L={vs1:'") + jsq(T("vs last")) + "',vs15:'" + jsq(T("vs 15 min")) + "',rt:'" + jsq(T("reading time")) +
+         "',ra:'" + jsq(T("reading age")) + "',min:'" + jsq(T("%d min")) + "',avg:'" + jsq(T("average")) + "',inr:'" + jsq(T("in range")) +
+         "',mm:'" + jsq(T("lowest / highest")) + "',var:'" + jsq(T("variability")) + "',low:'" + jsq(T("low")) + "',high:'" + jsq(T("high")) +
+         "',sd:'" + jsq(T("SD")) + "',empty:'" + jsq(T("empty")) + "',tap:'" + jsq(T("Tap a block, then pick what it shows.")) +
+         "',choose:'" + jsq(T("Choose what to show: %s")) + "',date:'" + jsq(d.c_str()) + "'};";
+}
 
 
 // Visual dashboard-layout editor (progressive enhancement: without JavaScript the plain selects inside
@@ -91,18 +118,18 @@ function pv(t){
  switch(t){
  case 'value':return '<b class=big>'+v+'</b><i class=unit>'+u+'</i>';
  case 'arrow':return '<svg class=ar viewBox="-50 -50 100 100"><g transform="rotate(45)"><rect x="-45" y="-3" width="62" height="6"/><polygon points="45,0 14,-25 14,25"/></g></svg>';
- case 'delta1':return '<i class=cap>vs last</i><b class=num>'+d1+'</b>';
- case 'delta15':return '<i class=cap>vs 15 min</i><b class=num>'+d15+'</b>';
- case 'clock':return '<i class=date>17 Oct</i><b class=num>09:52</b>';
- case 'readtime':return '<i class=cap>reading time</i><b class=num>09:50</b>';
- case 'age':return '<i class=cap>reading age</i><b class=num>2 min</b>';
+ case 'delta1':return '<i class=cap>'+L.vs1+'</i><b class=num>'+d1+'</b>';
+ case 'delta15':return '<i class=cap>'+L.vs15+'</i><b class=num>'+d15+'</b>';
+ case 'clock':return '<i class=date>'+L.date+'</i><b class=num>09:52</b>';
+ case 'readtime':return '<i class=cap>'+L.rt+'</i><b class=num>09:50</b>';
+ case 'age':return '<i class=cap>'+L.ra+'</i><b class=num>'+L.min.replace('%d',2)+'</b>';
  case 'fresh':return '<div class=fr><u class=f></u><u class=f></u><u class=f></u><u></u><u></u></div>';
- case 'avg':return '<i class=cap>average 16 h</i><b class=num>'+(mm?'7.4':'133')+'</b>';
- case 'tir':return '<i class=cap>in range 16 h</i><b class=num>72%</b><i class=cap>low 3%   high 25%</i>';
- case 'range':return '<i class=cap>lowest / highest</i><b class=num>'+(mm?'3.6 - 12.9':'65 - 232')+'</b>';
- case 'cv':return '<i class=cap>variability 16 h</i><b class=num>28%</b><i class=cap>SD '+(mm?'2.1':'38')+'</i>';
+ case 'avg':return '<i class=cap>'+L.avg+' 16 h</i><b class=num>'+(mm?'7.4':'133')+'</b>';
+ case 'tir':return '<i class=cap>'+L.inr+' 16 h</i><b class=num>72%</b><i class=cap>'+L.low+' 3%   '+L.high+' 25%</i>';
+ case 'range':return '<i class=cap>'+L.mm+'</i><b class=num>'+(mm?'3.6 - 12.9':'65 - 232')+'</b>';
+ case 'cv':return '<i class=cap>'+L.var+' 16 h</i><b class=num>28%</b><i class=cap>'+L.sd+' '+(mm?'2.1':'38')+'</i>';
  case 'graph':return '<svg class=gr viewBox="0 0 200 60" preserveAspectRatio="none"><rect x="14" y="20" width="182" height="22" fill="#ddd"/><path d="M14 8V54H196" fill="none" stroke="#000" stroke-width="1.5"/><path d="M14 20H196M14 42H196" stroke="#000" stroke-width=".6" stroke-dasharray="3 3"/><path d="M16 46C40 50 60 40 85 34S130 14 150 22 180 34 190 30" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="190" cy="30" r="3.4"/></svg>';
- default:return '<span class=none>empty</span>';}
+ default:return '<span class=none>'+L.empty+'</span>';}
 }
 const names=sel.map(s=>s.previousElementSibling.textContent);
 dash.innerHTML='<div class=band></div><div class=mid></div><div class=bot></div>';
@@ -113,7 +140,7 @@ function paint(i){cells[i].innerHTML=pv(sel[i].value)+'<span class=tag>'+names[i
 function paintAll(){sel.forEach((_,i)=>paint(i));}
 function choose(i){
  cells.forEach((c,j)=>c.classList.toggle('sel',j==i));
- pal.innerHTML='<h3>'+names[i]+': show</h3>';
+ pal.innerHTML='<h3>'+L.choose.replace('%s',names[i])+'</h3>';
  Array.from(sel[i].options).forEach(o=>{
   const b=document.createElement('button');b.type='button';b.className='o'+(o.value==sel[i].value?' on':'')+(i<3?' band':'');
   b.innerHTML='<div class=pv>'+pv(o.value)+'</div>'+o.textContent;
@@ -122,56 +149,63 @@ function choose(i){
 }
 if(unit)unit.addEventListener('change',paintAll);
 paintAll();
-pal.innerHTML='<p class=hint style="grid-column:1/-1">Tap a block, then pick what it shows.</p>';
+pal.innerHTML='<p class=hint style="grid-column:1/-1">'+L.tap+'</p>';
 })();
 )HTML";
 
 static void handleRoot() {
-  String h = PAGE_HEAD;
+  String h = pageHead();
   h += String("<style>") + EDITOR_CSS + "</style>";
-  if (server.hasArg("saved")) h += "<p class=ok>Saved.</p>";
+  if (server.hasArg("saved")) h += String("<p class=ok>") + T("Saved.") + "</p>";
   h += "<form method=post action=/save>";
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) {
     const ConfigField& f = CONFIG_FIELDS[i];
     String cur = cfgGet(f.key);
     if (!strcmp(f.key, "blk_tl"))  // the visual layout editor goes here; the plain selects stay as a fallback
-      h += "<h2>Dashboard layout</h2><div id=dash></div><div id=pal></div><div id=blkfb>";
+      h += String("<h2>") + T("Dashboard layout") + "</h2><div id=dash></div><div id=pal></div><div id=blkfb>";
     bool grouped = f.group[0];
     if (grouped) h += String("<div class='grp' data-g='") + f.group + "'>";
-    h += String("<label>") + f.label + "</label>";
+    h += String("<label>") + T(f.label) + "</label>";
     if (!strcmp(f.type, "select")) {
       h += String("<select name='") + f.key + "'" + (i == 0 ? " id=source" : "") + ">";
       const char* p = f.options;
       String v, l;
       while (nextOption(p, v, l))
-        h += String("<option value='") + v + "'" + (v == cur ? " selected" : "") + ">" + l + "</option>";
+        h += String("<option value='") + v + "'" + (v == cur ? " selected" : "") + ">" + T(l.c_str()) + "</option>";
       h += "</select>";
     } else if (!strcmp(f.type, "password")) {
       // never echo stored secrets; blank keeps the current value
       h += String("<input type=password name='") + f.key + "' autocomplete=off placeholder='" +
-           (cur.length() ? "(saved - leave blank to keep)" : "") + "'>";
+           (cur.length() ? T("(saved - leave blank to keep)") : "") + "'>";
     } else {
       h += String("<input type='") + f.type + "' name='" + f.key + "' value='" + esc(cur) + "'>";
     }
     if (grouped) h += "</div>";
     if (!strcmp(f.key, "blk_bottom")) h += "</div>";  // end of #blkfb
   }
-  h += "<button>Save</button></form>";
-  h += String("<p>Refresh: every ") + String(refreshMinutes()) + " min (set by the data source).</p>";
-  h += "<hr><form method=post action=/reset-wifi "
-       "onsubmit=\"return confirm('Erase saved WiFi and reboot into setup mode?')\">"
-       "<button class=danger>Erase WiFi and reboot into setup</button></form>"
+  h += String("<button>") + T("Save") + "</button></form>";
+  char refresh[160];
+  snprintf(refresh, sizeof(refresh), T("Refresh: every %d min (set by the data source)."), refreshMinutes());
+  h += String("<p>") + refresh + "</p>";
+  h += String("<hr><form method=post action=/reset-wifi onsubmit=\"return confirm('") + jsq(T("Erase saved WiFi and reboot into setup mode?")) + "')\">" +
+       "<button class=danger>" + T("Erase WiFi and reboot into setup") + "</button></form>"
        "<script>const s=document.getElementById('source');"
        "function sync(){document.querySelectorAll('.grp').forEach(d=>"
        "d.style.display=d.dataset.g===s.value?'':'none')}"
        "s.onchange=sync;sync();</script>";
-  h += String("<script>") + EDITOR_JS + "</script></body></html>";
+  h += String("<script>") + editorTexts() + EDITOR_JS + "</script></body></html>";
   server.send(200, "text/html", h);
 }
 
+static String fmt(const char* f, const char* a) {
+  char b[200];
+  snprintf(b, sizeof(b), f, a);
+  return b;
+}
+
 static void fail(const String& msg) {
-  server.send(400, "text/html", String(PAGE_HEAD) + "<p class=err>" + esc(msg) +
-                                  "</p><p><a href=/>Back</a></p></body></html>");
+  server.send(400, "text/html", pageHead() + "<p class=err>" + esc(msg) + "</p><p><a href=/>" + T("Back") +
+                                  "</a></p></body></html>");
 }
 
 static void handleSave() {
@@ -192,14 +226,14 @@ static void handleSave() {
       String ov, ol;
       bool found = false;
       while (nextOption(p, ov, ol)) found |= (ov == v);
-      if (!found) return fail(String("Invalid value for ") + f.label);
+      if (!found) return fail(fmt(T("Invalid value for %s"), T(f.label)));
     } else if (!strcmp(f.type, "url") && v.length()) {
       if (!v.startsWith("http://") && !v.startsWith("https://"))
-        return fail(String(f.label) + " must start with http:// or https://");
+        return fail(fmt(T("%s must start with http:// or https://"), T(f.label)));
       while (v.endsWith("/")) v.remove(v.length() - 1);
     } else if (!strcmp(f.type, "number")) {
       if (atoi(v.c_str()) < 20 || atoi(v.c_str()) > 400)
-        return fail(String(f.label) + " must be between 20 and 400");
+        return fail(fmt(T("%s must be between 20 and 400"), T(f.label)));
       v = String(atoi(v.c_str()));
     }
     vals[i] = v;
@@ -209,18 +243,19 @@ static void handleSave() {
     if (!strcmp(CONFIG_FIELDS[i].key, "low")) low = atoi(vals[i].c_str());
     if (!strcmp(CONFIG_FIELDS[i].key, "high")) high = atoi(vals[i].c_str());
   }
-  if (low >= high) return fail("Low threshold must be below the high threshold");
+  if (low >= high) return fail(T("Low threshold must be below the high threshold"));
 
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) cfgSet(CONFIG_FIELDS[i].key, vals[i]);
   settingsChanged = true;
+  i18nReload();  // the page after the redirect is already in the new language
   server.sendHeader("Location", "/?saved=1");
   server.send(303, "text/plain", "");
 }
 
 static void handleResetWifi() {
-  server.send(200, "text/html", String(PAGE_HEAD) +
-              "<p class=ok>WiFi erased. Rebooting: join the <b>GlucoPanel</b> hotspot to set it up again.</p>"
-              "</body></html>");
+  char msg[200];
+  snprintf(msg, sizeof(msg), T("WiFi erased. Rebooting: join the %s hotspot to set it up again."), AP_NAME);
+  server.send(200, "text/html", pageHead() + "<p class=ok>" + esc(msg) + "</p></body></html>");
   delay(1000);
   WiFiManager wm;
   wm.resetSettings();

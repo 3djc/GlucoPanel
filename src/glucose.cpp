@@ -6,6 +6,7 @@
 #include "config.h"
 #include "glucose.h"
 #include "http.h"
+#include "i18n.h"
 
 // ---------- helpers ----------
 
@@ -123,6 +124,13 @@ static Trend trendFromLibreArrow(int n) {  // 1 = SingleDown ... 5 = SingleUp
   return n >= 1 && n <= 5 ? t[n] : TREND_UNKNOWN;
 }
 
+// printf-style translated phrase with one number
+static String tf(const char* en, int n) {
+  char b[160];
+  snprintf(b, sizeof(b), T(en), n);
+  return b;
+}
+
 // ---------- reading history (for the deltas and the graph) ----------
 
 // Libre only reports the latest value each minute, so ~1 point/min can pile up over the graph window.
@@ -223,14 +231,14 @@ Deltas glucoseDeltas(const Reading& latest) {
 
 static FetchResult fetchNightscout() {
   String base = cfgGet("ns_url");
-  if (!base.length()) { FetchResult r; r.notConfigured = true; r.error = "Nightscout URL not set"; return r; }
+  if (!base.length()) { FetchResult r; r.notConfigured = true; r.error = T("Nightscout URL not set"); return r; }
   String url = base + "/api/v1/entries/sgv.json?count=" + String(fetchWindowMinutes() / 5 + 6);  // one reading per 5 min
   String tok = cfgGet("ns_token");
   if (tok.length()) url += "&token=" + urlEncode(tok);
 
   HttpResponse r = httpRequest("GET", url, "", {{"Accept", "application/json"}});
   if (r.status <= 0) return fail("Nightscout: " + r.error);
-  if (r.status == 401 || r.status == 403) return fail("Nightscout: access denied (check token)");
+  if (r.status == 401 || r.status == 403) return fail(String("Nightscout: ") + T("access denied (check token)"));
   if (r.status != 200) return fail("Nightscout: HTTP " + String(r.status));
 
   JsonDocument filter;
@@ -238,9 +246,9 @@ static FetchResult fetchNightscout() {
   filter[0]["date"] = true;
   filter[0]["direction"] = true;
   JsonDocument doc;
-  if (deserializeJson(doc, r.body.c_str(), DeserializationOption::Filter(filter))) return fail("Nightscout: unreadable response");
+  if (deserializeJson(doc, r.body.c_str(), DeserializationOption::Filter(filter))) return fail(String("Nightscout: ") + T("unreadable response"));
   JsonArray a = doc.as<JsonArray>();
-  if (a.isNull() || a.size() == 0) return fail("Nightscout: no readings");
+  if (a.isNull() || a.size() == 0) return fail(String("Nightscout: ") + T("no readings"));
 
   Reading newest;
   for (JsonObject o : a) {
@@ -251,7 +259,7 @@ static FetchResult fetchNightscout() {
     historyAdd(sgv, when, t);
     if (when > newest.when) { newest.valid = true; newest.mgdl = sgv; newest.when = when; newest.trend = t; }
   }
-  if (!newest.valid) return fail("Nightscout: reading has no value");
+  if (!newest.valid) return fail(String("Nightscout: ") + T("reading has no value"));
   return succeed(newest.mgdl, newest.trend, newest.when);
 }
 
@@ -288,7 +296,7 @@ static bool dexPost(const String& path, const String& body, String& out, String&
     if (out != "00000000-0000-0000-0000-000000000000") return true;
   }
   String code = dexErrorCode(r.body);
-  error = code.length() ? "Dexcom: " + code : "Dexcom: login failed (HTTP " + String(r.status) + ")";
+  error = code.length() ? "Dexcom: " + code : "Dexcom: " + tf("login failed (HTTP %d)", r.status);
   return false;
 }
 
@@ -305,7 +313,7 @@ static bool dexLogin(String& error) {
 
 static FetchResult fetchDexcom() {
   if (!cfgGet("dex_user").length() || !cfgGet("dex_pass").length()) {
-    FetchResult r; r.notConfigured = true; r.error = "Dexcom username/password not set"; return r;
+    FetchResult r; r.notConfigured = true; r.error = T("Dexcom username/password not set"); return r;
   }
   for (int attempt = 0; attempt < 2; attempt++) {
     String error;
@@ -319,9 +327,9 @@ static FetchResult fetchDexcom() {
     if (r.status != 200) return fail(code.length() ? "Dexcom: " + code : "Dexcom: HTTP " + String(r.status));
 
     JsonDocument doc;
-    if (deserializeJson(doc, r.body.c_str())) return fail("Dexcom: unreadable response");
+    if (deserializeJson(doc, r.body.c_str())) return fail(String("Dexcom: ") + T("unreadable response"));
     JsonArray a = doc.as<JsonArray>();
-    if (a.isNull() || a.size() == 0) return fail("Dexcom: no recent readings");
+    if (a.isNull() || a.size() == 0) return fail(String("Dexcom: ") + T("no recent readings"));
     Reading newest;
     for (JsonObject o : a) {
       int val = o["Value"] | 0;
@@ -333,10 +341,10 @@ static FetchResult fetchDexcom() {
       historyAdd(val, when, t);
       if (when > newest.when) { newest.valid = true; newest.mgdl = val; newest.when = when; newest.trend = t; }
     }
-    if (!newest.valid) return fail("Dexcom: reading has no value");
+    if (!newest.valid) return fail(String("Dexcom: ") + T("reading has no value"));
     return succeed(newest.mgdl, newest.trend, newest.when);
   }
-  return fail("Dexcom: session expired");
+  return fail(String("Dexcom: ") + T("session expired"));
 }
 
 // ---------- LibreLinkUp ----------
@@ -378,31 +386,31 @@ static bool lluLogin(String& error) {
         lluHeaders(false));
     if (r.status <= 0) { error = "LibreLinkUp: " + r.error; return false; }
     JsonDocument d;
-    if (deserializeJson(d, r.body.c_str())) { error = "LibreLinkUp: unreadable login response (HTTP " + String(r.status) + ")"; return false; }
+    if (deserializeJson(d, r.body.c_str())) { error = "LibreLinkUp: " + tf("unreadable login response (HTTP %d)", r.status); return false; }
     int status = d["status"] | -1;
-    if (status == 2) { error = "LibreLinkUp: wrong email or password"; return false; }
-    if (status == 4) { error = "LibreLinkUp: accept the new terms in the LibreLinkUp app"; return false; }
-    if (status != 0) { error = "LibreLinkUp: login status " + String(status); return false; }
+    if (status == 2) { error = String("LibreLinkUp: ") + T("wrong email or password"); return false; }
+    if (status == 4) { error = String("LibreLinkUp: ") + T("accept the new terms in the LibreLinkUp app"); return false; }
+    if (status != 0) { error = "LibreLinkUp: " + tf("login status %d", status); return false; }
     if (d["data"]["redirect"] | false) {
       String region = String(d["data"]["region"] | "");
-      if (!region.length() || region == lluRegion) { error = "LibreLinkUp: region redirect failed"; return false; }
+      if (!region.length() || region == lluRegion) { error = String("LibreLinkUp: ") + T("region redirect failed"); return false; }
       lluRegion = region;  // e.g. "de"
       continue;
     }
     const char* token = d["data"]["authTicket"]["token"] | "";
     const char* uid = d["data"]["user"]["id"] | "";
-    if (!*token || !*uid) { error = "LibreLinkUp: login needs an extra step (open the LibreLinkUp app)"; return false; }
+    if (!*token || !*uid) { error = String("LibreLinkUp: ") + T("login needs an extra step (open the LibreLinkUp app)"); return false; }
     lluToken = token;
     lluAccountHash = sha256Hex(uid);
     return true;
   }
-  error = "LibreLinkUp: region redirect loop";
+  error = String("LibreLinkUp: ") + T("region redirect loop");
   return false;
 }
 
 static FetchResult fetchLibre() {
   if (!cfgGet("libre_email").length() || !cfgGet("libre_pass").length()) {
-    FetchResult r; r.notConfigured = true; r.error = "LibreLinkUp email/password not set"; return r;
+    FetchResult r; r.notConfigured = true; r.error = T("LibreLinkUp email/password not set"); return r;
   }
   for (int attempt = 0; attempt < 2; attempt++) {
     String error;
@@ -413,12 +421,12 @@ static FetchResult fetchLibre() {
     if (r.status != 200) return fail("LibreLinkUp: HTTP " + String(r.status));
 
     JsonDocument doc;
-    if (deserializeJson(doc, r.body.c_str())) return fail("LibreLinkUp: unreadable response");
+    if (deserializeJson(doc, r.body.c_str())) return fail(String("LibreLinkUp: ") + T("unreadable response"));
     JsonArray conns = doc["data"].as<JsonArray>();
-    if (conns.isNull() || conns.size() == 0) return fail("LibreLinkUp: no connections (share your data in LibreLink)");
+    if (conns.isNull() || conns.size() == 0) return fail(String("LibreLinkUp: ") + T("no connections (share your data in LibreLink)"));
     JsonObject gm = conns[0]["glucoseMeasurement"];
     int mgdl = (int)lround(gm["ValueInMgPerDl"] | 0.0);
-    if (mgdl <= 0) return fail("LibreLinkUp: no glucose measurement");
+    if (mgdl <= 0) return fail(String("LibreLinkUp: ") + T("no glucose measurement"));
     time_t when = parseLibreStamp(gm["FactoryTimestamp"] | "");  // UTC
     Trend trend = trendFromLibreArrow(gm["TrendArrow"] | 0);
     lluPatient = String(conns[0]["patientId"] | "");
@@ -444,7 +452,7 @@ static FetchResult fetchLibre() {
     }
     return succeed(mgdl, trend, when);
   }
-  return fail("LibreLinkUp: session expired");
+  return fail(String("LibreLinkUp: ") + T("session expired"));
 }
 
 // ---------- public ----------
@@ -471,8 +479,8 @@ FetchResult fetchGlucose() {
     historyClear();
   }
 
-  if (WiFi.status() != WL_CONNECTED) return fail("WiFi disconnected");
-  if (time(nullptr) < 1700000000) return fail("Waiting for the clock (NTP)");
+  if (WiFi.status() != WL_CONNECTED) return fail(T("WiFi disconnected"));
+  if (time(nullptr) < 1700000000) return fail(T("Waiting for the clock (NTP)"));
 
   String src = cfgGet("source");
   if (src == "dexcom") return fetchDexcom();

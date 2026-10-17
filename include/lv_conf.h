@@ -19,12 +19,10 @@
 #define LV_USE_THEME_SIMPLE 0
 #define LV_USE_THEME_MONO 0
 
-#define LV_FONT_MONTSERRAT_14 1
-#define LV_FONT_MONTSERRAT_16 1
-#define LV_FONT_MONTSERRAT_24 1
-#define LV_FONT_MONTSERRAT_32 1
-#define LV_FONT_MONTSERRAT_48 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_16
+// Fonts: Montserrat Medium generated with lv_font_conv, ASCII + Latin-1 (accents for fr/de/it/es);
+// see src/font_ui_*.c and the README. The built-in Montserrat fonts are ASCII only, so they are off.
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(font_ui_16)
+#define LV_FONT_DEFAULT &font_ui_16
 
 #define LV_USE_QRCODE 1
 
