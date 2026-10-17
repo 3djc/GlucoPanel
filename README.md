@@ -23,17 +23,20 @@ Open the address shown on the display from any device on the same network.
 | --- | --- |
 | Data source | Nightscout (URL, optional token), LibreLinkUp (email, password, region) or Dexcom Share (username, password, server) |
 | Display unit | mg/dL or mmol/L |
+| Block contents | What each of the seven blocks shows (see below) |
 | Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
-The panel then shows the dashboard and refetches on a timer. The screen is laid out as a 3 × 3 grid of blocks (no grid lines are drawn):
+The panel then shows the dashboard and refetches on a timer. The screen is a grid of seven blocks (no grid lines are drawn), and **each block's content is chosen in the settings page**:
 
 | | | |
 | --- | --- | --- |
-| trend arrow | change vs the previous reading | change vs 15 min ago |
-| date (DD Mon) above clock (HH:MM), local time | **glucose value** | freshness bar (one segment per minute of age, up to 5) |
-| **glucose graph** (last 3 h, spanning all three cells) | | |
+| top row, left (in the grey band) | top row, middle | top row, right |
+| middle row, left | middle row, centre | middle row, right |
+| bottom row (full width) | | |
+
+Any of the six small blocks can show: nothing, the **glucose value** (big, with its unit), the **trend arrow**, the **change vs the previous reading**, the **change vs 15 min ago**, the **date and time** (local, see the time zone setting), the **time of the reading**, the **age of the reading** (minutes), or the **freshness bar** (one segment per minute of age, up to 5). The bottom row shows the **glucose graph** or nothing. The default layout is arrow / change / change, clock / value / freshness bar, graph. The same content can be used in several blocks. The layout is rebuilt when the settings are saved.
 
 Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (the last `GRAPH_HOURS` = 3 h from Dexcom and Nightscout, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). The graph shows the last 3 h as a line (dot on the newest reading), with the low..high thresholds as a light-grey band and the y range following the data (at least 60..200 mg/dL). Readings more than 20 min apart are not joined. A thin strip under it shows the last fetch error. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
@@ -127,7 +130,8 @@ src/
   lvgl_port.*       LVGL <-> ePaper glue: flush callback (black/white + dither), full/partial refresh policy
   ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
   graph.*           glucose graph widget (line, low/high band, hour ticks)
-  display.*         dashboard screen (LVGL widgets, trend arrow)
+  display.*         dashboard screen: mode switching, the grid of blocks
+  cells.*           what a block can show (value, arrow, deltas, clock, age, freshness bar, graph)
   font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
   http.*            HTTP(S) client (device)
 sim/

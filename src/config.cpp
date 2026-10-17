@@ -1,6 +1,11 @@
 #include "config.h"
 #include <Preferences.h>
 
+// What a dashboard block can show (see cells.h).
+#define BLOCK_OPTIONS \
+  "none:Empty|value:Glucose value|arrow:Trend arrow|delta1:Change vs last reading|delta15:Change vs 15 min ago|" \
+  "clock:Date and time|readtime:Time of the reading|age:Age of the reading|fresh:Freshness bar"
+
 const ConfigField CONFIG_FIELDS[] = {
   {"source", "Data source", "select", "", "nightscout:Nightscout|libre:LibreLinkUp|dexcom:Dexcom Share", "nightscout"},
 
@@ -23,6 +28,14 @@ const ConfigField CONFIG_FIELDS[] = {
    "AEST-10AEDT,M10.1.0,M4.1.0/3:Sydney", "CET-1CEST,M3.5.0,M10.5.0/3"},
   {"low", "Low threshold (mg/dL)", "number", "", "", "70"},
   {"high", "High threshold (mg/dL)", "number", "", "", "180"},
+
+  {"blk_tl", "Top row, left", "select", "", BLOCK_OPTIONS, "arrow"},
+  {"blk_tm", "Top row, middle", "select", "", BLOCK_OPTIONS, "delta1"},
+  {"blk_tr", "Top row, right", "select", "", BLOCK_OPTIONS, "delta15"},
+  {"blk_ml", "Middle row, left", "select", "", BLOCK_OPTIONS, "clock"},
+  {"blk_mc", "Middle row, centre", "select", "", BLOCK_OPTIONS, "value"},
+  {"blk_mr", "Middle row, right", "select", "", BLOCK_OPTIONS, "fresh"},
+  {"blk_bottom", "Bottom row", "select", "", "graph:Glucose graph (3 h)|none:Empty", "graph"},
 };
 const int CONFIG_FIELD_COUNT = sizeof(CONFIG_FIELDS) / sizeof(CONFIG_FIELDS[0]);
 
