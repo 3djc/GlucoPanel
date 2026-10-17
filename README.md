@@ -1,6 +1,6 @@
 # GlucoPanel
 
-Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800×480 monochrome ePaper, no touch), built with PlatformIO and the Arduino framework. It includes an SDL2 simulator so you can develop without the device.
+Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800×480 monochrome ePaper, no touch), built with PlatformIO, the Arduino framework and [LVGL](https://lvgl.io) 9.5 for the UI. It includes an SDL2 simulator so you can develop without the device.
 
 > **Status:** WiFi onboarding, the settings page, glucose fetching (Nightscout, LibreLinkUp, Dexcom Share), the dashboard and the simulator are implemented. The fetchers are tested against a mock server only; they have not been run against the real services or on the device.
 
@@ -21,6 +21,7 @@ Open the address shown on the display from any device on the same network.
 | --- | --- |
 | Data source | Nightscout (URL, optional token), LibreLinkUp (email, password, region) or Dexcom Share (username, password, server) |
 | Display unit | mg/dL or mmol/L |
+| Time zone | Used for the HH:MM reading time on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
@@ -29,10 +30,10 @@ The panel then shows the dashboard and refetches on a timer. The screen is laid 
 | | | |
 | --- | --- | --- |
 | trend arrow | change vs the previous reading | change vs 15 min ago |
-| _(empty)_ | **glucose value** | _(empty)_ |
+| time of the reading (HH:MM) | **glucose value** | freshness bar (one segment per minute of age, up to 5) |
 | _(empty)_ | _(empty)_ | _(empty)_ |
 
-Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (Dexcom 30 min, Nightscout 30 entries, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/display.cpp`, 0 to 16 dots per 4×4 pixels). A thin strip at the very bottom shows the reading's age (left) and the last fetch error. The low/high thresholds are stored but not used on screen yet. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
+Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (Dexcom 30 min, Nightscout 30 entries, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). A thin strip at the very bottom shows the reading's age (left) and the last fetch error. The low/high thresholds are stored but not used on screen yet. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
 
 Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
@@ -40,7 +41,7 @@ Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Pa
 
 ## ePaper refresh policy
 
-Full refreshes flash and wear the panel, so `src/display.cpp` avoids them:
+Full refreshes flash and wear the panel, so `src/lvgl_port.cpp` and `src/display.cpp` avoid them:
 
 - **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and every 30 minutes to clear ghosting (`FULL_REFRESH_MS`).
 - **Partial refresh** of one window covering just the blocks that changed (arrow, deltas, value), the "Updated N min ago" strip once a minute, and the error text.
@@ -107,12 +108,13 @@ Other variables:
 | `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
 | `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
 
-Text uses the same font data and metrics as the device (Seeed_GFX fonts 1, 2, 4, 6, 7 and 8, copied into `sim/fonts/`); the FreeFonts are not supported. Limitations: ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
+The sim runs the same LVGL UI code as the device; only the panel (an SDL window) and the Arduino/WiFi layers are stand-ins. Limitations: ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
 
 ## Layout
 
 ```
 platformio.ini      environments: reterminal_e1001 (device), sim (SDL2)
+include/lv_conf.h   LVGL configuration (device and sim)
 src/
   main.cpp          setup/loop
   driver.h          Seeed_GFX board selection
@@ -120,12 +122,14 @@ src/
   config.*          settings table and NVS storage
   config_server.*   settings web page
   glucose.*         Nightscout / LibreLinkUp / Dexcom fetchers
-  display.*         dashboard screen
+  lvgl_port.*       LVGL <-> ePaper glue: flush callback (black/white + dither), full/partial refresh policy
+  ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
+  display.*         dashboard screen (LVGL widgets, trend arrow)
+  font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
   http.*            HTTP(S) client (device)
 sim/
   sim_main.cpp      SDL2 host and drawing
   http_sim.cpp      HTTP client (libcurl)
-  fonts/            Seeed_GFX font data used by the sim text renderer
   include/          Arduino, WiFi, WebServer, Preferences... stand-ins
 tools/
   mock_cgm.py       mock CGM services for the simulator
@@ -135,3 +139,5 @@ tools/
 
 - Include order matters in `wifi_setup.cpp` and `config_server.cpp`: Seeed_GFX defines `FS_NO_GLOBALS`, which breaks `WebServer.h` if its headers come first.
 - Button pins (GPIO 3 and 4, active low) come from the [Seeed Arduino peripherals cookbook](https://wiki.seeedstudio.com/reterminal_e10xx_with_arduino_peripherals/); confirm them on your board.
+- The UI is LVGL 9.5 (pinned in `platformio.ini`; 9.6 changed some APIs). LVGL renders to RGB565, `src/lvgl_port.cpp` thresholds each pixel to black/white and writes it to the panel framebuffer. Only `UI_GREY` is dithered.
+- `src/font_big_96.c` and `src/font_big_128.c` were generated from Montserrat Medium (SIL OFL) with `lv_font_conv --size 128 --bpp 4 --no-compress --format lvgl --symbols "0123456789.-+"`. Regenerate them the same way to change the size.

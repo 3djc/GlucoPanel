@@ -17,6 +17,10 @@ const ConfigField CONFIG_FIELDS[] = {
   {"dex_region", "Server", "select", "dexcom", "us:United States|ous:Outside US|jp:Japan", "us"},
 
   {"unit", "Display unit", "select", "", "mgdl:mg/dL|mmol:mmol/L", "mgdl"},
+  {"tz", "Time zone (for the reading time)", "select", "",
+   "UTC0:UTC|GMT0BST,M3.5.0/1,M10.5.0:London|CET-1CEST,M3.5.0,M10.5.0/3:Paris / Berlin / Madrid|EET-2EEST,M3.5.0/3,M10.5.0/4:Helsinki / Athens|"
+   "EST5EDT,M3.2.0,M11.1.0:New York|CST6CDT,M3.2.0,M11.1.0:Chicago|MST7MDT,M3.2.0,M11.1.0:Denver|PST8PDT,M3.2.0,M11.1.0:Los Angeles|"
+   "AEST-10AEDT,M10.1.0,M4.1.0/3:Sydney", "CET-1CEST,M3.5.0,M10.5.0/3"},
   {"low", "Low threshold (mg/dL)", "number", "", "", "70"},
   {"high", "High threshold (mg/dL)", "number", "", "", "180"},
 };

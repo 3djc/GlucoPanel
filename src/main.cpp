@@ -1,14 +1,13 @@
 #include <Arduino.h>
 #include <algorithm>
 #include <WiFi.h>
-#include "TFT_eSPI.h"
 #include "config.h"
 #include "config_server.h"
 #include "display.h"
 #include "glucose.h"
+#include "ui.h"
+#include "lvgl_port.h"
 #include "wifi_setup.h"
-
-EPaper epaper;
 
 static bool online = false;
 static unsigned long nextFetch = 0;
@@ -25,7 +24,7 @@ static void refresh() {
     lastError = r.error;
   }
   deltas = glucoseDeltas(lastGood);
-  drawDashboard(epaper, lastGood, deltas, lastError, r.notConfigured, "http://" + WiFi.localIP().toString());
+  drawDashboard(lastGood, deltas, lastError, r.notConfigured, "http://" + WiFi.localIP().toString());
 
   unsigned long wait = (unsigned long)refreshMinutes() * 60000UL;
   if (!r.ok) {
@@ -45,8 +44,8 @@ static void refresh() {
 
 void setup() {
   Serial.begin(115200);
-  epaper.begin();
-  online = wifiConnect(epaper);
+  portBegin();
+  online = wifiConnect();
   if (online) {
     glucoseInit();
     configServerBegin();
@@ -59,7 +58,7 @@ void loop() {
     bool changed = configServerTakeChanged();
     if (changed) lastGood = Reading();  // new source/credentials: drop the old reading
     if (changed || millis() >= nextFetch) refresh();
-    dashboardTick(epaper);
+    dashboardTick();
   }
   delay(2);
 }
