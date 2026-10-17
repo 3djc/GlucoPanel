@@ -2,6 +2,7 @@
 #include <math.h>
 #include "config.h"
 #include "glucose.h"
+#include "profile.h"
 #include "ui.h"
 
 namespace {
@@ -10,8 +11,8 @@ const int GRAPH_MAX = GRAPH_HOURS * 60 + 60;
 const time_t WINDOW = GRAPH_HOURS * 3600;
 const time_t MAX_GAP = 20 * 60;  // readings further apart than this are not joined by a line
 
-// Margins inside the widget: y labels on the left, hour labels at the bottom.
-const int LEFT = 56, RIGHT = 14, TOP = 10, BOTTOM = 26;
+// Margins inside the widget: y labels on the left, hour labels at the bottom (sizes: profile.cpp).
+const int LEFT = M.gLeft, RIGHT = M.gRight, TOP = M.gTop, BOTTOM = M.gBottom;
 
 struct State {
   Reading pts[GRAPH_MAX];
@@ -29,7 +30,7 @@ void drawLabel(lv_layer_t* layer, const char* text, const lv_area_t& area, lv_te
   lv_draw_label_dsc_init(&d);
   d.text = text;
   d.text_local = 1;  // drawing is deferred: LVGL keeps its own copy of the text
-  d.font = &font_ui_14;
+  d.font = M.fSmall;
   d.color = lv_color_black();
   d.align = align;
   lv_draw_label(layer, &d, &area);
@@ -92,8 +93,8 @@ void drawCb(lv_event_t* ev) {
   band.bg_opa = LV_OPA_COVER;
   lv_area_t ba = {px, Y(g.high), px + pw, Y(g.low)};
   lv_draw_rect(layer, &band, &ba);
-  drawLine(layer, px, Y(g.high), px + pw, Y(g.high), 1, 4);
-  drawLine(layer, px, Y(g.low), px + pw, Y(g.low), 1, 4);
+  drawLine(layer, px, Y(g.high), px + pw, Y(g.high), 1, M.gDash);
+  drawLine(layer, px, Y(g.low), px + pw, Y(g.low), 1, M.gDash);
 
   // axes
   drawLine(layer, px, py, px, py + ph, 2);
@@ -104,7 +105,7 @@ void drawCb(lv_event_t* ev) {
   for (int k = 0; k < 2; k++) {
     int v = k ? g.high : g.low, y = Y(v);
     valueText(buf, sizeof(buf), v);
-    lv_area_t la = {a.x1, y - 9, a.x1 + LEFT - 8, y + 9};
+    lv_area_t la = {a.x1, y - M.gLabelH, a.x1 + LEFT - 8, y + M.gLabelH};
     drawLabel(layer, buf, la, LV_TEXT_ALIGN_RIGHT);
   }
 
@@ -115,9 +116,9 @@ void drawCb(lv_event_t* ev) {
     localtime_r(&t, &lt);
     if (lt.tm_min != 0) continue;
     int x = X(t);
-    drawLine(layer, x, py + ph, x, py + ph + 6, 2);
+    drawLine(layer, x, py + ph, x, py + ph + M.gTick, 2);
     snprintf(buf, sizeof(buf), "%02d:00", lt.tm_hour);
-    lv_area_t la = {x - 30, py + ph + 7, x + 30, py + ph + BOTTOM};
+    lv_area_t la = {x - M.gTickLabelHalfW, py + ph + M.gTickLabelDy, x + M.gTickLabelHalfW, py + ph + BOTTOM};
     drawLabel(layer, buf, la, LV_TEXT_ALIGN_CENTER);
   }
 
@@ -129,12 +130,12 @@ void drawCb(lv_event_t* ev) {
     if (r.when < t0 || r.when > g.end) continue;
     if (prev && r.when - prev->when < 90) continue;  // Dexcom repeats a measurement a few seconds apart
     bool joined = prev && r.when - prev->when <= MAX_GAP;
-    if (joined) drawLine(layer, X(prev->when), Y(prev->mgdl), X(r.when), Y(r.mgdl), 4, 0, true);
-    else if (prev && !prevJoined) drawDot(layer, X(prev->when), Y(prev->mgdl), 3);
+    if (joined) drawLine(layer, X(prev->when), Y(prev->mgdl), X(r.when), Y(r.mgdl), M.gLine, 0, true);
+    else if (prev && !prevJoined) drawDot(layer, X(prev->when), Y(prev->mgdl), M.gDot);
     prevJoined = joined;
     prev = &r;
   }
-  if (prev) drawDot(layer, X(prev->when), Y(prev->mgdl), 7);  // newest reading, emphasised
+  if (prev) drawDot(layer, X(prev->when), Y(prev->mgdl), M.gDotBig);  // newest reading, emphasised
 }
 
 }  // namespace

@@ -4,7 +4,7 @@
 
 // Light grey used for filled areas. The panel is black/white only, so lvgl_port.cpp renders exactly
 // this colour as a sparse dither pattern; every other colour is thresholded to black or white.
-#define UI_GREY lv_color_hex(0xE0E0E0)
+#define UI_GREY lv_color_hex(0xDEDEDE)  // r = g = b after RGB565 rounding (0xE0E0E0 comes out slightly pink)
 
 // UI text: Montserrat Medium, ASCII + Latin-1 (48 px: ASCII only, it only shows numbers).
 LV_FONT_DECLARE(font_ui_14);
@@ -40,6 +40,17 @@ void uiShowErasePrompt(const String& ssid);
 void uiShowPortal(const String& hotspotPassword);  // hotspot + captive portal: QR codes to join (WPA password) and to open the setup page
 void uiShowConnected(const String& ssid, const String& ip, const String& url, const String& code);
 void uiShowWifiFailed();
+
+// Dashboard modes without a reading (called by display.cpp, which handles the refresh bookkeeping)
+void uiShowNotConfigured(const String& name, const String& url, const String& code);
+void uiShowNoData(const String& name, const String& error);
+
+#ifdef UI_PROFILE_LCD
+// Touch hit tests and feedback for the LCD profile's on-screen buttons.
+int uiErasePromptHit(int x, int y);          // boot prompt: 1 = "erase and set up new WiFi", 2 = "retry", 0 = neither
+bool uiConfigEraseHit(int x, int y);         // settings screen: inside the "hold to erase WiFi" button
+void uiConfigEraseProgress(int percent);     // fills that button while it is held (0..100)
+#endif
 
 // Settings screen opened by a short press of the green button: QR code and address of the settings page.
 void uiShowConfigQr(const String& url, const String& code);

@@ -6,60 +6,62 @@
 #include "display.h"
 #include "glucose.h"
 #include "i18n.h"
+#include "input.h"
 #include "ui.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"
 
 static bool online = false;
 
-// reTerminal E1001 user buttons (active low, see wifi_setup.cpp): green = KEY0, the other one = KEY1.
-static const int BTN_GREEN = 3, BTN_OTHER = 4;
-static const unsigned long LONG_PRESS_MS = 3000;      // green button: hold this long to erase the WiFi
 static const unsigned long CONFIG_SCREEN_MS = 60000;  // the settings screen closes by itself after this
-
-enum Press { PRESS_NONE, PRESS_SHORT, PRESS_LONG };
-struct Button {
-  int pin;
-  bool down = false, longFired = false;
-  unsigned long since = 0;
-};
-static Button green{BTN_GREEN}, other{BTN_OTHER};
-
-// Poll every loop. SHORT is reported on release, LONG once, as soon as the button has been held long enough.
-static Press pollButton(Button& b) {
-  bool low = digitalRead(b.pin) == LOW;
-  unsigned long now = millis();
-  if (low && !b.down) {
-    b.down = true;
-    b.longFired = false;
-    b.since = now;
-  } else if (low && !b.longFired && now - b.since >= LONG_PRESS_MS) {
-    b.longFired = true;
-    return PRESS_LONG;
-  } else if (!low && b.down) {
-    b.down = false;
-    if (!b.longFired && now - b.since >= 40) return PRESS_SHORT;  // ignore contact bounce
-  }
-  return PRESS_NONE;
-}
 
 static bool configShown = false;
 static unsigned long configSince = 0;
 
-static void handleButtons() {
-  Press g = pollButton(green), o = pollButton(other);
-  if (g == PRESS_LONG) wifiEraseAndRestart();
+static void openConfig() {
+  configShown = true;
+  configSince = millis();
+  Serial.printf("settings code: %s\n", configServerNewCode().c_str());  // a fresh code each time the screen opens
+  dashboardShowConfig("http://" + WiFi.localIP().toString(), configServerCode());
+}
+
+static void closeConfig() {
+  configShown = false;
+  dashboardHideConfig();
+}
+
+// E-paper: green short press opens the settings screen, any short press closes it, holding green for
+// 3 s erases the WiFi. LCD: a tap opens it; on it, holding the erase button for 3 s erases the WiFi and
+// a tap anywhere else closes it. (A touch screen is touched by accident far more easily than a button
+// on the back, hence the dedicated button.)
+static void handleInput() {
+  Input in = inputPoll();
+  bool timeout = configShown && millis() - configSince > CONFIG_SCREEN_MS;
+#ifdef UI_PROFILE_LCD
   if (configShown) {
-    if (g == PRESS_SHORT || o == PRESS_SHORT || millis() - configSince > CONFIG_SCREEN_MS) {
-      configShown = false;
-      dashboardHideConfig();
+    static int shownPct = -1;
+    bool onErase = in.down && uiConfigEraseHit(in.x, in.y);
+    int pct = onErase ? (int)std::min(100UL, in.heldMs * 100 / LONG_PRESS_MS) : 0;
+    if (pct / 4 != shownPct / 4) {  // redraw the progress in 4 % steps
+      shownPct = pct;
+      uiConfigEraseProgress(pct);
     }
-  } else if (g == PRESS_SHORT && online) {
-    configShown = true;
-    configSince = millis();
-    Serial.printf("settings code: %s\n", configServerNewCode().c_str());  // a fresh code each time the screen opens
-    dashboardShowConfig("http://" + WiFi.localIP().toString(), configServerCode());
+    if (in.gesture == G_HOLD && uiConfigEraseHit(in.x, in.y)) wifiEraseAndRestart();
+    if ((in.gesture == G_TAP && !uiConfigEraseHit(in.x, in.y)) || timeout) {
+      shownPct = -1;
+      closeConfig();
+    }
+  } else if (in.gesture == G_TAP && online) {
+    openConfig();
   }
+#else
+  if (in.gesture == G_HOLD && !in.secondary) wifiEraseAndRestart();
+  if (configShown) {
+    if (in.gesture == G_TAP || timeout) closeConfig();
+  } else if (in.gesture == G_TAP && !in.secondary && online) {
+    openConfig();
+  }
+#endif
 }
 
 static unsigned long nextFetch = 0;
@@ -98,6 +100,7 @@ void setup() {
   Serial.begin(115200);
   i18nReload();  // the saved language applies from the first screen
   portBegin();
+  inputBegin();
   online = wifiConnect();
   if (online) {
     glucoseInit();
@@ -107,7 +110,7 @@ void setup() {
 }
 
 void loop() {
-  handleButtons();
+  handleInput();
   if (online) {
     configServerHandle();
     bool changed = configServerTakeChanged();

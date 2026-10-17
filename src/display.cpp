@@ -4,20 +4,17 @@
 #include "config.h"
 #include "i18n.h"
 #include "lvgl_port.h"
+#include "profile.h"
 #include "ui.h"
 
 namespace {
 
-const int SCREEN_W = 800;
+const int SCREEN_W = M.screenW;
 
 enum Mode { MODE_NONE, MODE_NOT_CONFIGURED, MODE_NO_DATA, MODE_READING };
 
-// Top band (like Gluco-Monitor's): rounded, light grey, three cells.
-const int BAND_X = 6, BAND_Y = 10, BAND_W = 788, BAND_H = 130, BAND_RADIUS = 10;
-const int BAND_CELL_W = BAND_W / 3;
-const int MID_Y = 160, MID_H = 160;      // middle row: three blocks of a third of the screen
-const int GRAPH_Y = 322, GRAPH_H = 136;  // bottom row: one block across the full width
-const int STRIP_Y = 458;                 // error text under it
+// Top band (like Gluco-Monitor's): rounded, light grey, three cells. All sizes come from the profile (profile.cpp).
+const int BAND_CELL_W = M.bandW / 3;
 
 // The blocks, in the order of their settings: top row, middle row, bottom row.
 const int N_CELLS = 7;
@@ -61,19 +58,19 @@ void buildReadingScreen() {
   lv_obj_t* scr = uiNewScreen();
 
   lv_obj_t* band = lv_obj_create(scr);
-  lv_obj_set_pos(band, BAND_X, BAND_Y);
-  lv_obj_set_size(band, BAND_W, BAND_H);
+  lv_obj_set_pos(band, M.bandX, M.bandY);
+  lv_obj_set_size(band, M.bandW, M.bandH);
   lv_obj_set_style_bg_color(band, UI_GREY, 0);
   lv_obj_set_style_bg_opa(band, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(band, BAND_RADIUS, 0);
+  lv_obj_set_style_radius(band, M.bandRadius, 0);
   lv_obj_set_style_border_width(band, 0, 0);
   lv_obj_set_style_pad_all(band, 0, 0);
   lv_obj_remove_flag(band, LV_OBJ_FLAG_SCROLLABLE);
 
   for (int i = 1; i < 3; i++) {  // separators
     lv_obj_t* sep = lv_obj_create(band);
-    lv_obj_set_pos(sep, i * BAND_CELL_W, 14);
-    lv_obj_set_size(sep, 1, BAND_H - 28);
+    lv_obj_set_pos(sep, i * BAND_CELL_W, M.bandSepInset);
+    lv_obj_set_size(sep, 1, M.bandH - 2 * M.bandSepInset);
     lv_obj_set_style_bg_color(sep, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(sep, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(sep, 0, 0);
@@ -89,27 +86,27 @@ void buildReadingScreen() {
       c.x = i * BAND_CELL_W;
       c.y = 0;
       c.w = BAND_CELL_W;
-      c.h = BAND_H;
+      c.h = M.bandH;
     } else if (i < 6) {  // middle row
       c.parent = scr;
       c.x = (i - 3) * SCREEN_W / 3;
       c.w = (i - 2) * SCREEN_W / 3 - c.x;
-      c.y = MID_Y;
-      c.h = MID_H;
+      c.y = M.midY;
+      c.h = M.midH;
       c.middleRow = true;
     } else {  // bottom row
       c.parent = scr;
       c.x = 0;
-      c.y = GRAPH_Y;
+      c.y = M.graphY;
       c.w = SCREEN_W;
-      c.h = GRAPH_H;
+      c.h = M.graphH;
     }
     cellBuild(c);
   }
 
-  errorLabel = uiLabel(scr, "", &font_ui_16, 10, STRIP_Y);
+  errorLabel = uiLabel(scr, "", M.fCaption, M.edge, M.stripY);
   lv_label_set_long_mode(errorLabel, LV_LABEL_LONG_CLIP);
-  lv_obj_set_width(errorLabel, SCREEN_W - 20);
+  lv_obj_set_width(errorLabel, SCREEN_W - 2 * M.edge);
 }
 
 }  // namespace
@@ -145,21 +142,12 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
       buildReadingScreen();
       updateCells();
       setError(error);
+      portRefresh(true);
+    } else if (mode == MODE_NOT_CONFIGURED) {
+      uiShowNotConfigured(name, configUrl, configCode);  // these draw and refresh the screen themselves
     } else {
-      lv_obj_t* s = uiNewScreen();
-      uiLabel(s, name.c_str(), &font_ui_32, 20, 20);
-      if (mode == MODE_NOT_CONFIGURED) {
-        uiLabel(s, T("Not configured"), &font_ui_32, 20, 100);
-        uiLabel(s, T("Open this page to choose your"), &font_ui_16, 20, 160);
-        uiLabel(s, T("glucose data source:"), &font_ui_16, 20, 190);
-        uiShowAddressAndCode(s, 20, 240, configUrl, configCode);
-        uiQR(s, 500, 60, 280, uiConfigLink(configUrl, configCode).c_str());
-      } else {
-        uiLabel(s, T("No data yet"), &font_ui_32, 20, 100);
-        if (error.length()) uiLabel(s, ("! " + error).c_str(), &font_ui_16, 20, 440);
-      }
+      uiShowNoData(name, error);
     }
-    portRefresh(true);
   }
 
   shown.mode = mode;

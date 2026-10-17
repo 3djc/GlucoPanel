@@ -2,12 +2,84 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include <stdlib.h>
-#include "TFT_eSPI.h"
+#include "profile.h"
 #include "ui.h"
+#ifdef UI_PROFILE_LCD
+#include "panel.h"
+#else
+#include "TFT_eSPI.h"
+#endif
 #ifdef ARDUINO
 #include <esp_heap_caps.h>
 #endif
 
+// Union of the areas flushed since the last panel refresh.
+static lv_area_t dirty;
+static bool hasDirty = false;
+static lv_display_t* display;
+static uint8_t* drawBuffer;
+
+static void markDirty(const lv_area_t* area) {
+  if (!hasDirty) {
+    dirty = *area;
+    hasDirty = true;
+  } else {
+    dirty.x1 = LV_MIN(dirty.x1, area->x1);
+    dirty.y1 = LV_MIN(dirty.y1, area->y1);
+    dirty.x2 = LV_MAX(dirty.x2, area->x2);
+    dirty.y2 = LV_MAX(dirty.y2, area->y2);
+  }
+}
+
+static uint32_t tickCb() { return millis(); }
+
+// LVGL renders `bufferLines` screen lines at a time (partial render mode) into one RGB565 buffer.
+static void createDisplay(int bufferLines, bool preferPsram, lv_display_flush_cb_t flush) {
+  size_t bytes = (size_t)M.screenW * bufferLines * sizeof(uint16_t);
+#ifdef ARDUINO
+  if (preferPsram) drawBuffer = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#endif
+  if (!drawBuffer) drawBuffer = (uint8_t*)malloc(bytes);
+  if (!drawBuffer) {
+    Serial.println("LVGL buffer allocation failed.");
+    while (true) delay(1000);
+  }
+  display = lv_display_create(M.screenW, M.screenH);
+  lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+  lv_display_set_flush_cb(display, flush);
+  lv_display_set_buffers(display, drawBuffer, nullptr, bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
+}
+
+#ifdef UI_PROFILE_LCD
+// ---------------------------------------------------------------------------------------------------
+// Colour LCD: the flush callback copies each rendered area into the panel's frame buffer, and
+// portRefresh() pushes the frame buffer to the screen when something was drawn. A full frame takes
+// ~50 ms on the JC3248W535, so there is no partial / full refresh policy and no dithering.
+// ---------------------------------------------------------------------------------------------------
+static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
+  panelDraw(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (const uint16_t*)px);
+  markDirty(area);
+  lv_display_flush_ready(disp);
+}
+
+void portBegin() {
+  panelBegin();
+  lv_init();
+  lv_tick_set_cb(tickCb);
+  createDisplay(40, false, flushCb);  // 480 x 40 x 2 = 38 KB in internal RAM
+}
+
+void portRefresh(bool forceFull) {
+  if (forceFull) lv_obj_invalidate(lv_screen_active());
+  hasDirty = false;
+  lv_refr_now(display);
+  if (forceFull || hasDirty) panelPresent();
+}
+
+#else
+// ---------------------------------------------------------------------------------------------------
+// e-paper (reTerminal E1001)
+// ---------------------------------------------------------------------------------------------------
 // ePaper policy: a full refresh flashes and wears the panel, so it is only used when the screen
 // layout changes and every FULL_REFRESH_MS to clear ghosting. Everything else (new reading, age
 // text, error text) is a single partial refresh of the smallest window covering what changed.
@@ -22,19 +94,10 @@
 #define LIGHT_GREY_DOTS 2
 #endif
 
-#define SCREEN_W 800
-#define SCREEN_H 480
-#define BUFFER_LINES 24
 #define BLACK_BELOW 128  // luminance (0..255) under which a pixel is drawn black
 
 static EPaper epaper;
-static lv_display_t* display;
-static uint8_t* drawBuffer;
 static unsigned long lastFullMs = 0;
-
-// Union of the areas flushed since the last panel refresh.
-static lv_area_t dirty;
-static bool hasDirty = false;
 
 static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
   static const uint8_t bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -55,41 +118,16 @@ static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
       epaper.drawPixel(ax, ay, black ? TFT_BLACK : TFT_WHITE);
     }
   }
-  if (!hasDirty) {
-    dirty = *area;
-    hasDirty = true;
-  } else {
-    dirty.x1 = LV_MIN(dirty.x1, area->x1);
-    dirty.y1 = LV_MIN(dirty.y1, area->y1);
-    dirty.x2 = LV_MAX(dirty.x2, area->x2);
-    dirty.y2 = LV_MAX(dirty.y2, area->y2);
-  }
+  markDirty(area);
   lv_display_flush_ready(disp);
 }
-
-static uint32_t tickCb() { return millis(); }
 
 void portBegin() {
   epaper.begin();
   epaper.fillScreen(TFT_WHITE);
-
   lv_init();
   lv_tick_set_cb(tickCb);
-
-  size_t bytes = SCREEN_W * BUFFER_LINES * sizeof(uint16_t);
-#ifdef ARDUINO
-  drawBuffer = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-#endif
-  if (!drawBuffer) drawBuffer = (uint8_t*)malloc(bytes);
-  if (!drawBuffer) {
-    Serial.println("LVGL buffer allocation failed.");
-    while (true) delay(1000);
-  }
-
-  display = lv_display_create(SCREEN_W, SCREEN_H);
-  lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
-  lv_display_set_flush_cb(display, flushCb);
-  lv_display_set_buffers(display, drawBuffer, nullptr, bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
+  createDisplay(24, true, flushCb);  // 800 x 24 x 2 = 38 KB, PSRAM when there is some
 }
 
 void portRefresh(bool forceFull) {
@@ -105,3 +143,5 @@ void portRefresh(bool forceFull) {
     epaper.updataPartial(dirty.x1, dirty.y1, dirty.x2 - dirty.x1 + 1, dirty.y2 - dirty.y1 + 1);
   }
 }
+
+#endif  // UI_PROFILE_LCD

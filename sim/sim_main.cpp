@@ -2,7 +2,12 @@
 // SIM_SCREENSHOT=file%d.bmp saves each update(); SIM_FRAMES=n exits after n loop() calls.
 #include <SDL.h>
 #include <Arduino.h>
+#ifdef UI_PROFILE_LCD
+#include "panel.h"
+#include "touch.h"
+#else
 #include <TFT_eSPI.h>
+#endif
 #include <cstdlib>
 
 SerialShim Serial;
@@ -62,6 +67,7 @@ static void pump() {
   }
 }
 
+#ifndef UI_PROFILE_LCD
 void EPaper::begin() {
   SDL_Init(SDL_INIT_VIDEO);
   win = SDL_CreateWindow("Gluco Panel (sim)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -109,6 +115,83 @@ void EPaper::fillScreen(uint16_t c) { memset(fb_, c & 0xF, sizeof(fb_)); }
 void EPaper::drawPixel(int x, int y, uint16_t c) {
   if (x >= 0 && y >= 0 && x < SIM_W && y < SIM_H) fb_[y * SIM_W + x] = c & 0xF;
 }
+#else
+// ---- colour LCD stand-in (JC3248W535): an SDL window, the mouse is the touch screen ----
+static const int LCD_W = 480, LCD_H = 320;
+static uint16_t lcdFb[LCD_W * LCD_H];
+
+void panelBegin() {
+  SDL_Init(SDL_INIT_VIDEO);
+  win = SDL_CreateWindow("Gluco Panel (sim, LCD)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, LCD_W, LCD_H, SDL_WINDOW_ALLOW_HIGHDPI);
+  ren = SDL_CreateRenderer(win, -1, 0);
+  tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, LCD_W, LCD_H);
+  memset(lcdFb, 0xFF, sizeof(lcdFb));
+}
+
+void panelDraw(int x, int y, int w, int h, const uint16_t* px) {
+  for (int j = 0; j < h; j++) {
+    if (y + j < 0 || y + j >= LCD_H) continue;
+    for (int i = 0; i < w; i++)
+      if (x + i >= 0 && x + i < LCD_W) lcdFb[(y + j) * LCD_W + x + i] = px[j * w + i];
+  }
+}
+
+void panelPresent() {
+  static int n = 0;
+  printf("lcd: frame #%d\n", ++n);
+  SDL_UpdateTexture(tex, nullptr, lcdFb, LCD_W * 2);
+  SDL_RenderClear(ren);
+  SDL_RenderCopy(ren, tex, nullptr, nullptr);
+  SDL_RenderPresent(ren);
+  if (const char* path = getenv("SIM_SCREENSHOT")) {
+    static uint8_t rgb[LCD_W * LCD_H * 3];
+    for (int i = 0; i < LCD_W * LCD_H; i++) {
+      uint16_t c = lcdFb[i];
+      rgb[i * 3] = ((c >> 11) & 0x1F) * 255 / 31;
+      rgb[i * 3 + 1] = ((c >> 5) & 0x3F) * 255 / 63;
+      rgb[i * 3 + 2] = (c & 0x1F) * 255 / 31;
+    }
+    SDL_Surface* sf = SDL_CreateRGBSurfaceWithFormatFrom(rgb, LCD_W, LCD_H, 24, LCD_W * 3, SDL_PIXELFORMAT_RGB24);
+    static int shot = 0;
+    char name[512];
+    snprintf(name, sizeof(name), path, ++shot);
+    SDL_SaveBMP(sf, name);
+    SDL_FreeSurface(sf);
+  }
+  pump();
+}
+
+void touchBegin() {}
+
+// SIM_TOUCH=<x>:<y>:<start ms>:<duration ms>[,...] touches that point during each window (scripted tests)
+TouchPoint touchPoll() {
+  TouchPoint t;
+  pump();
+  if (const char* taps = getenv("SIM_TOUCH")) {
+    const char* p = taps;
+    while (*p) {
+      int x = 0, y = 0;
+      long start = 0, dur = 0;
+      if (sscanf(p, "%d:%d:%ld:%ld", &x, &y, &start, &dur) == 4 && (long)millis() >= start && (long)millis() < start + dur) {
+        t.down = true;
+        t.x = x;
+        t.y = y;
+        return t;
+      }
+      const char* comma = strchr(p, ',');
+      if (!comma) break;
+      p = comma + 1;
+    }
+  }
+  int mx = 0, my = 0;
+  if (SDL_GetMouseState(&mx, &my) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+    t.down = true;
+    t.x = mx;
+    t.y = my;
+  }
+  return t;
+}
+#endif
 
 int main() {
   setvbuf(stdout, nullptr, _IOLBF, 0);  // line-buffered so logs show up when redirected

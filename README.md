@@ -1,6 +1,11 @@
 # GlucoPanel
 
-Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800×480 monochrome ePaper, no touch), built with PlatformIO, the Arduino framework and [LVGL](https://lvgl.io) 9.5 for the UI. It includes an SDL2 simulator so you can develop without the device.
+Glucose display firmware, built with PlatformIO, the Arduino framework and [LVGL](https://lvgl.io) 9.5 for the UI. It supports two displays (two *profiles* of the same code) and includes an SDL2 simulator for each, so you can develop without the device:
+
+| Profile | Hardware | Screen | Input | PlatformIO environment |
+| --- | --- | --- | --- | --- |
+| e-paper (default) | Seeed **reTerminal E1001** (ESP32-S3) | 7.5" 800×480, black and white, partial refresh | two buttons on the back | `reterminal_e1001`, simulator `sim` |
+| colour LCD | Guition **JC3248W535** (ESP32-S3, 16 MB flash, 8 MB PSRAM) | 3.5" 480×320, colour, capacitive touch | touch screen | `jc3248w535`, simulator `sim_lcd` |
 
 ![GlucoPanel dashboard in the simulator, with mock data](docs/screenshot.png)
 
@@ -26,9 +31,15 @@ Glucose display firmware for the Seeed **reTerminal E1001** (ESP32-S3, 7.5" 800�
 3. **No WiFi saved (or erased).** The panel opens a hotspot named **`GlucoPanel`** with a captive portal. The hotspot is protected (WPA2) by a random password made on first use and kept in flash; the screen shows it as text and inside the first QR code, which joins the hotspot when scanned. The second QR code opens `http://192.168.4.1`.
 4. **Connected.** The screen shows the SSID, the IP and a QR code for the settings page, which is also at `http://glucopanel.local`.
 
-### Buttons
+### Buttons (e-paper) and touch (LCD)
 
-On the dashboard the green button (KEY0) does two things:
+On the **LCD profile** there are no buttons; the touch screen does the same jobs:
+
+- **Tap** on the dashboard: opens the settings screen (QR code, address, a new 6-digit code). It closes after 60 s or with a tap anywhere else on it.
+- **Hold 3 s** on the "Hold 3 s to erase the WiFi" button of that screen: a fill grows across the button, then the saved WiFi is erased and the panel restarts in setup mode. The button is there on purpose: a screen is touched by accident far more easily than a button on the back, so holding "anywhere" would be too easy to trigger.
+- **At boot**, if the saved WiFi cannot be joined: two on-screen buttons, "Erase and set up new WiFi" and "Retry".
+
+On the **e-paper profile** the green button (KEY0) does two things:
 
 - **Short press:** shows a screen with a QR code, the address of the settings page and a new 6-digit code (see below). It closes after 60 s or when you press any button.
 - **Hold for 3 s:** erases the saved WiFi and restarts in setup mode (the hotspot described above). This also works while the QR screen is up.
@@ -103,6 +114,21 @@ pio run -e reterminal_e1001 -t upload     # flash
 pio device monitor                        # serial, 115200 baud
 ```
 
+For the colour LCD board use the `jc3248w535` environment instead:
+
+```sh
+pio run -e jc3248w535 -t upload           # build and flash over USB
+```
+
+Notes for the JC3248W535 (all verified on a real board with `tools/bringup_jc3248w535`):
+
+- It needs the pioarduino platform (Arduino core 3.x) and GFX Library for Arduino **1.6.9** (1.6.0 does not compile against core 3.3).
+- The environment sets `ARDUINO_USB_MODE=1`, so the chip's own USB-Serial-JTAG is used. With Arduino's TinyUSB serial instead, `esptool` cannot reset the chip and every upload would need the BOOT button.
+- The display is pushed as a full frame (~50 ms); some batches of this panel ignore partial window updates. Touch is read over I2C (address 0x3B); a touch counts as released after 150 ms without a point.
+- Pins: display QSPI 45, 47, 21, 48, 40, 39, backlight 1, touch SDA 4, SCL 8, INT 11, RST 12.
+- Before flashing a board that already runs something, you can keep a copy of its flash: `esptool read_flash 0 0x1000000 backup.bin` (it may contain your saved WiFi and account data, so keep it private).
+- `tools/bringup_jc3248w535/` is a small standalone test (colour bars, touch coordinates, a `B` serial command that reboots into the bootloader).
+
 `src/driver.h` selects the board and screen for the Seeed_GFX library (`BOARD_SCREEN_COMBO 520` = reTerminal E1001). For other boards see the [Seeed ePaper + PlatformIO guide](https://wiki.seeedstudio.com/epaper_work_with_platformio/).
 
 ## Simulator
@@ -111,7 +137,8 @@ The `sim` environment builds the same `src/` code for your computer, with an SDL
 
 ```sh
 brew install sdl2            # macOS, once
-pio run -e sim -t exec
+pio run -e sim -t exec        # e-paper profile (800x480)
+pio run -e sim_lcd -t exec    # colour LCD profile (480x320, click = touch)
 ```
 
 - The window is 800×480. **Esc** or closing it quits.
@@ -137,6 +164,7 @@ Other variables:
 | `SIM_API_BASE=<url>` | Send every HTTP request to this base URL (see above) |
 | `SIM_NOWAIT=1` | Skip waiting for Enter on the setup screen |
 | `SIM_PRESS=<pin>` | Hold that button pin pressed (3 or 4) |
+| `SIM_TOUCH=<x>:<y>:<start ms>:<duration ms>[,...]` | LCD simulator: touch that point during each time window (the mouse also works) |
 | `SIM_TAP=<pin>:<start ms>:<duration ms>[,...]` | Press that button during each time window, e.g. `3:4000:300` is a short press at 4 s, `3:3000:4500` a long one |
 | `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
 | `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
@@ -146,7 +174,7 @@ The sim runs the same LVGL UI code as the device; only the panel (an SDL window)
 ## Layout
 
 ```
-platformio.ini      environments: reterminal_e1001 (device), sim (SDL2)
+platformio.ini      environments: reterminal_e1001, jc3248w535 (devices), sim, sim_lcd (SDL2)
 include/lv_conf.h   LVGL configuration (device and sim)
 src/
   main.cpp          setup/loop
@@ -155,7 +183,11 @@ src/
   config.*          settings table and NVS storage
   config_server.*   settings web page
   glucose.*         Nightscout / LibreLinkUp / Dexcom fetchers
-  lvgl_port.*       LVGL <-> ePaper glue: flush callback (black/white + dither), full/partial refresh policy
+  profile.*         per-profile table of every screen-dependent size and font (e-paper / LCD)
+  lvgl_port.*       LVGL <-> panel glue: e-paper: black/white + dither, full/partial refresh policy; LCD: frame push
+  panel.h, panel_axs15231b.cpp   LCD panel interface and the JC3248W535 driver (QSPI, backlight)
+  touch.h, touch_axs15231b.cpp   touch interface and the JC3248W535 driver (I2C)
+  input.*           one input layer: buttons (e-paper) or touch (LCD) -> tap / hold
   ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
   graph.*           glucose graph widget (line, low/high band, hour ticks)
   i18n.*            translation table (T("English text")), month names, language setting
@@ -163,9 +195,10 @@ src/
   cells.*           what a block can show (value, arrow, deltas, clock, age, freshness bar, graph)
   font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
   font_ui_*.c       generated LVGL fonts for all other text (Montserrat Medium, ASCII + Latin-1)
+  font_lcd_*.c      the same for the 480x320 colour profile (smaller sizes)
   http.*            HTTP(S) client (device)
 sim/
-  sim_main.cpp      SDL2 host and drawing
+  sim_main.cpp      SDL2 host: e-paper window, or the colour LCD window with the mouse as touch screen
   http_sim.cpp      HTTP client (libcurl)
   include/          Arduino, WiFi, WebServer, Preferences... stand-ins
 tools/

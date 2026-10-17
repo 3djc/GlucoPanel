@@ -3,15 +3,12 @@
 #include <string.h>
 #include "graph.h"
 #include "i18n.h"
+#include "profile.h"
 #include "ui.h"
 
 namespace {
 
 const int SEGMENTS = 5;
-
-// Content that is centred in the middle row sits on the centre of the value + unit ink (measured on
-// the rendered screen: y=187..327 in the 160 px row starting at y=160, i.e. 17 px below the row centre).
-const int VALUE_BLOCK_SHIFT = 17;
 
 void setText(lv_obj_t* label, const char* text) {
   if (strcmp(lv_label_get_text(label), text)) lv_label_set_text(label, text);
@@ -20,7 +17,7 @@ void setText(lv_obj_t* label, const char* text) {
 int lineHeight(const lv_font_t* f) { return lv_font_get_line_height(f); }
 
 // Vertical centre of the block's small content.
-int centreY(const Cell& c) { return c.y + c.h / 2 + (c.middleRow ? VALUE_BLOCK_SHIFT : 0); }
+int centreY(const Cell& c) { return c.y + c.h / 2 + (c.middleRow ? M.valueShift : 0); }
 
 lv_obj_t* label(const Cell& c, const lv_font_t* font, int top) { return uiLabel(c.parent, "", font, c.x, top, c.w); }
 
@@ -66,7 +63,7 @@ void arrowDrawCb(lv_event_t* ev) {
   }
   lv_area_t a;
   lv_obj_get_coords(obj, &a);
-  const float len = 90;
+  const float len = (float)M.arrowLen;
   float cx = (a.x1 + a.x2 + 1) / 2.0f, cy = (a.y1 + a.y2 + 1) / 2.0f;
   float r = deg * (float)M_PI / 180.0f, dx = cosf(r), dy = sinf(r), px = -dy, py = dx;
   float hl = len * 0.35f, hw = len * 0.28f, sw = len * 0.06f;
@@ -99,28 +96,29 @@ void arrowDrawCb(lv_event_t* ev) {
 // A caption over a big number (the delta, reading time and age blocks).
 void buildCaptioned(Cell& c, const char* caption) {
   int cy = centreY(c);
-  c.b = label(c, &font_ui_16, cy - 49);
+  c.b = label(c, M.fCaption, cy + M.capDy);
   lv_label_set_text(c.b, caption);
-  c.a = label(c, &font_ui_48, cy - 21);
+  c.a = label(c, M.fNum, cy + M.numDy);
 }
 
 // Like buildCaptioned, plus a small line under the number (c.c).
 void buildStat(Cell& c, const char* caption) {
   buildCaptioned(c, caption);
-  c.c = label(c, &font_ui_16, centreY(c) + 36);
+  c.c = label(c, M.fCaption, centreY(c) + M.subDy);
 }
 
 void buildValue(Cell& c) {
-  bool tall = c.h >= 150;
+  bool tall = c.h >= M.tallH;
   int mid = c.y + c.h / 2;
-  c.a = label(c, &font_big_128, 0);
-  lv_obj_set_y(c.a, mid + (tall ? -8 : -10) - lineHeight(&font_big_128) / 2);
-  c.b = label(c, &font_ui_24, 0);
-  lv_obj_set_y(c.b, mid + (tall ? 74 : 44) - lineHeight(&font_ui_24) / 2);
+  const lv_font_t* big = tall ? M.fBigL : M.fBigM;
+  c.a = label(c, big, 0);
+  lv_obj_set_y(c.a, mid + (tall ? M.digitsTall : M.digitsShort) - lineHeight(big) / 2);
+  c.b = label(c, M.fMid, 0);
+  lv_obj_set_y(c.b, mid + (tall ? M.unitTall : M.unitShort) - lineHeight(M.fMid) / 2);
 }
 
 void buildArrow(Cell& c) {
-  const int BOX = 120;
+  const int BOX = M.arrowBox;
   c.a = lv_obj_create(c.parent);
   lv_obj_set_size(c.a, BOX, BOX);
   lv_obj_set_pos(c.a, c.x + (c.w - BOX) / 2, centreY(c) - BOX / 2);
@@ -129,19 +127,19 @@ void buildArrow(Cell& c) {
   lv_obj_remove_flag(c.a, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_user_data(c.a, &c);
   lv_obj_add_event_cb(c.a, arrowDrawCb, LV_EVENT_DRAW_MAIN, nullptr);
-  c.b = uiLabel(c.parent, "?", &font_ui_48, c.x, centreY(c) - lineHeight(&font_ui_48) / 2, c.w);
+  c.b = uiLabel(c.parent, "?", M.fNum, c.x, centreY(c) - lineHeight(M.fNum) / 2, c.w);
 }
 
 void buildClock(Cell& c) {
   // Measured: the date + time ink is centred 13 px above the time label's centre.
-  int timeTop = centreY(c) + 13 - lineHeight(&font_ui_48) / 2;
-  c.a = label(c, &font_ui_48, timeTop);
-  c.b = label(c, &font_ui_24, timeTop - lineHeight(&font_ui_24) + 6);
+  int timeTop = centreY(c) + M.clockDy - lineHeight(M.fNum) / 2;
+  c.a = label(c, M.fNum, timeTop);
+  c.b = label(c, M.fMid, timeTop - lineHeight(M.fMid) + M.dateGap);
 }
 
 // SEGMENTS stacked segments filling from the bottom, one per minute of age.
 void buildFresh(Cell& c) {
-  const int barH = c.h >= 150 ? 140 : 100, segW = 98, GAP = 5;
+  const int barH = c.h >= M.tallH ? M.barTall : M.barShort, segW = M.segW, GAP = M.segGap;
   const int segH = (barH - (SEGMENTS - 1) * GAP) / SEGMENTS;
   int top = centreY(c) - barH / 2;
   for (int i = 0; i < SEGMENTS; i++) {  // seg[0] is the bottom one
@@ -150,8 +148,8 @@ void buildFresh(Cell& c) {
     lv_obj_set_size(sg, segW, segH);
     lv_obj_set_style_bg_color(sg, lv_color_black(), 0);
     lv_obj_set_style_border_color(sg, lv_color_black(), 0);
-    lv_obj_set_style_border_width(sg, 3, 0);  // empty segments stay visible as outlines
-    lv_obj_set_style_radius(sg, 5, 0);
+    lv_obj_set_style_border_width(sg, M.segBorder, 0);  // empty segments stay visible as outlines
+    lv_obj_set_style_radius(sg, M.segRadius, 0);
     lv_obj_remove_flag(sg, LV_OBJ_FLAG_SCROLLABLE);
     c.seg[i] = sg;
   }
@@ -164,9 +162,10 @@ void updateValue(Cell& c, const CellView& v) {
   if (v.mmol) snprintf(buf, sizeof(buf), "%.1f", v.last.mgdl / 18.016);
   else snprintf(buf, sizeof(buf), "%d", v.last.mgdl);
   // biggest font that still fits the block
-  const lv_font_t* candidates[] = {&font_big_128, &font_big_96, &font_ui_48};
-  const lv_font_t* f = candidates[c.h >= 150 ? 0 : 1];
-  for (int i = c.h >= 150 ? 0 : 1; i < 3; i++) {
+  const lv_font_t* candidates[] = {M.fBigL, M.fBigM, M.fNum};
+  bool tall = c.h >= M.tallH;
+  const lv_font_t* f = candidates[tall ? 0 : 1];
+  for (int i = tall ? 0 : 1; i < 3; i++) {
     f = candidates[i];
     lv_point_t size;
     lv_text_get_size(&size, buf, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
@@ -277,10 +276,10 @@ void updateHba1c(Cell& c, const CellView& v) {
     snprintf(buf + 24, 40, T("%.1f / %d days"), h.coveredDays, HBA1C_DAYS);
   }
   // the number is big; the "not available" text is a smaller, wrapping one
-  const lv_font_t* f = h.ok ? &font_ui_48 : &font_ui_24;
+  const lv_font_t* f = h.ok ? M.fNum : M.fMid;
   if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) {
     lv_obj_set_style_text_font(c.a, f, LV_PART_MAIN);
-    lv_obj_set_y(c.a, centreY(c) - (h.ok ? 21 : 12));
+    lv_obj_set_y(c.a, centreY(c) - (h.ok ? M.hbaNum : M.hbaNoData));
   }
   setText(c.a, buf);
   setText(c.c, buf + 24);

@@ -8,12 +8,10 @@
 #include "wifi_setup.h"
 #include "config.h"
 #include "config_server.h"
+#include "input.h"
 #include "secrets.h"
 #include "ui.h"
 
-// reTerminal E1001 user buttons: active low, external pull-ups.
-static const int BTN_ERASE = 3;  // KEY0 (green)
-static const int BTN_RETRY = 4;  // KEY1
 static const unsigned long JOIN_TIMEOUT_MS = 20000;
 static const unsigned long PROMPT_TIMEOUT_MS = 60000;  // then retry automatically
 
@@ -29,9 +27,18 @@ static bool askEraseCredentials(const String& ssid) {
   uiShowErasePrompt(ssid);
   unsigned long t0 = millis();
   while (millis() - t0 < PROMPT_TIMEOUT_MS) {
-    if (digitalRead(BTN_ERASE) == LOW) return true;
-    if (digitalRead(BTN_RETRY) == LOW) return false;
-    delay(50);
+    Input in = inputPoll();
+#ifdef UI_PROFILE_LCD
+    if (in.gesture == G_TAP) {  // the two on-screen buttons
+      int hit = uiErasePromptHit(in.x, in.y);
+      if (hit == 1) return true;
+      if (hit == 2) return false;
+    }
+#else
+    if (in.gesture == G_TAP && !in.secondary) return true;  // KEY0 (green): erase
+    if (in.gesture == G_TAP && in.secondary) return false;  // KEY1: retry
+#endif
+    delay(20);
   }
   return false;
 }
@@ -52,8 +59,6 @@ static void showPortalScreen(WiFiManager*) { uiShowPortal(hotspotPassword()); }
 
 bool wifiConnect() {
   WiFi.mode(WIFI_STA);
-  pinMode(BTN_ERASE, INPUT);
-  pinMode(BTN_RETRY, INPUT);
   WiFiManager wm;
   bool ok = false;
   while (wm.getWiFiIsSaved()) {
