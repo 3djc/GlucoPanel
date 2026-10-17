@@ -31,6 +31,16 @@ const ConfigField CONFIG_FIELDS[] = {
    "UTC0:UTC|GMT0BST,M3.5.0/1,M10.5.0:London|CET-1CEST,M3.5.0,M10.5.0/3:Paris / Berlin / Madrid|EET-2EEST,M3.5.0/3,M10.5.0/4:Helsinki / Athens|"
    "EST5EDT,M3.2.0,M11.1.0:New York|CST6CDT,M3.2.0,M11.1.0:Chicago|MST7MDT,M3.2.0,M11.1.0:Denver|PST8PDT,M3.2.0,M11.1.0:Los Angeles|"
    "AEST-10AEDT,M10.1.0,M4.1.0/3:Sydney", "CET-1CEST,M3.5.0,M10.5.0/3"},
+  // Night mode (white on black); the backlight levels only exist where there is a backlight (the colour LCD)
+#ifdef UI_PROFILE_LCD
+  {"brightness", "Brightness (%)", "number", "", "10:100", "100"},
+#endif
+  {"night_mode", "Night mode (dark theme)", "select", "", "off:Off|on:On|auto:Scheduled", "off"},
+  {"night_from", "Night starts at", "time", "", "", "22:00"},
+  {"night_to", "Night ends at", "time", "", "", "07:00"},
+#ifdef UI_PROFILE_LCD
+  {"night_level", "Night brightness (%)", "number", "", "5:100", "10"},
+#endif
   {"low", "Low threshold (mg/dL)", "number", "", "", "70"},
   {"high", "High threshold (mg/dL)", "number", "", "", "180"},
 

@@ -57,6 +57,8 @@ Open the address shown on the display from any device on the same network.
 | Block contents | What each of the seven blocks shows (see below) |
 | HbA1c unit | % (NGSP, default) or mmol/mol (IFCC) for the estimated HbA1c block |
 | Check server certificates | Yes (default): HTTPS servers must present a certificate signed by a known authority. No: accept any certificate (insecure) |
+| Night mode, Night starts / ends at | White-on-black dashboard, always on or on a schedule (see below) |
+| Brightness, Night brightness | Backlight levels, colour LCD only |
 | Language | English (default), Français, Deutsch, Italiano or Español: the panel screens, the fetch errors and this page |
 | Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
@@ -81,6 +83,14 @@ Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Pa
 **Access to the settings page.** The page needs a 6-digit **code that only the panel shows**: under the address on the "WiFi connected" and "Not configured" screens, and on the screen opened by a short press of the green button (a new code is made each time). The QR codes on those screens contain the code, so scanning one opens the page directly; otherwise open the address and type the code. A correct code starts a session (a cookie, 30 minutes after the last request); five wrong codes lock the page for a minute. Changing settings or erasing the WiFi therefore takes someone who can see the panel. The code is also printed on the serial console.
 
 What this does **not** do: the page is still plain HTTP, so someone who can read your WiFi traffic can see the code and the session cookie; and secrets (the WiFi password, the service credentials) are stored unencrypted in the ESP32's flash, readable by someone with physical access and a cable. Flash encryption would fix the latter, but it is irreversible and makes development harder, so it is not used.
+
+## Night mode
+
+A night mode shows the dashboard **white on black**, set on the settings page (both profiles):
+
+- **Night mode:** Off, On, or Scheduled. Scheduled uses **Night starts at** and **Night ends at** in your time zone; the night may run over midnight (for example 22:00 to 07:00). Until the clock is set (NTP) the schedule counts as day. The settings are looked at every couple of seconds, so a change made on the page shows within moments.
+- **How it is drawn:** the colours are inverted when the frame is pushed to the panel, so no widget needed changing. On the e-paper the light grey (a sparse dither) becomes dark grey (mostly black with sparse white dots), and the switch between day and night is a full refresh, twice a day for a schedule. The WiFi and settings screens keep their normal colours, so their QR codes stay easy to scan.
+- **Colour LCD only:** the backlight goes to **Night brightness** (default 10 %); **Brightness** (default 100 %) is the level the rest of the time. When the colours and the brightness both change, the colours change first and the brightness second, so the screen never flashes bright in a dark room. The e-paper has no backlight, so these two settings only exist on the LCD profile.
 
 ## ePaper refresh policy
 

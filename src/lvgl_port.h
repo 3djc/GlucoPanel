@@ -15,3 +15,12 @@ void portBegin();
 //                      full refresh every FULL_REFRESH_MS to clear ghosting. Nothing is refreshed
 //                      when nothing changed.
 void portRefresh(bool forceFull);
+
+// Night mode. Inverting turns the black-on-white UI into white on black, in the flush callback, so no widget
+// needs to know; the caller redraws (portRefresh(true)) after changing it.
+void portSetInvert(bool invert);
+bool portInverted();
+
+#ifdef UI_PROFILE_LCD
+void portSetBacklight(int percent);  // 0..100 (the e-paper has no backlight)
+#endif

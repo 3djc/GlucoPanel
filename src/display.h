@@ -14,5 +14,9 @@ void drawDashboard(const Reading& last, const Deltas& deltas, const String& erro
 void dashboardShowConfig(const String& url, const String& code);
 void dashboardHideConfig();
 
+// Night mode: shows the dashboard white on black while `night` is true (night.cpp). The WiFi and
+// settings screens keep their normal colours so that their QR codes stay easy to scan.
+void dashboardSetNight(bool night);
+
 // Call from loop(): once a minute, refreshes only the age text (partial refresh).
 void dashboardTick();

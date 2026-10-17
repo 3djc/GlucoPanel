@@ -11,11 +11,14 @@
 static const int PIN_BACKLIGHT = 1;
 
 static Arduino_Canvas* canvas = nullptr;
-static bool backlightOn = false;
+static bool shown = false;      // the first frame has been pushed: the backlight may come on
+static int backlightPercent = 100;
+
+static void applyBacklight() { ledcWrite(PIN_BACKLIGHT, shown ? backlightPercent * 255 / 100 : 0); }
 
 void panelBegin() {
-  pinMode(PIN_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_BACKLIGHT, LOW);  // dark until the first frame is ready: no flash of garbage
+  ledcAttach(PIN_BACKLIGHT, 5000, 8);  // PWM: 5 kHz, 8 bits
+  ledcWrite(PIN_BACKLIGHT, 0);          // dark until the first frame is ready: no flash of garbage
   Arduino_DataBus* bus = new Arduino_ESP32QSPI(45, 47, 21, 48, 40, 39);
   Arduino_GFX* panel = new Arduino_AXS15231B(bus, GFX_NOT_DEFINED, 0, false, 320, 480);
   canvas = new Arduino_Canvas(320, 480, panel, 0, 0, 0);
@@ -30,9 +33,14 @@ void panelDraw(int x, int y, int w, int h, const uint16_t* rgb565) {
 
 void panelPresent() {
   canvas->flush();
-  if (!backlightOn) {
-    backlightOn = true;
-    digitalWrite(PIN_BACKLIGHT, HIGH);
+  if (!shown) {
+    shown = true;
+    applyBacklight();
   }
+}
+
+void panelBacklight(int percent) {
+  backlightPercent = constrain(percent, 0, 100);
+  applyBacklight();
 }
 #endif

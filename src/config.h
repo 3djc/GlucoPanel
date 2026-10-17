@@ -5,9 +5,9 @@
 struct ConfigField {
   const char* key;      // NVS key (max 15 chars)
   const char* label;
-  const char* type;     // text | url | password | number | select
+  const char* type;     // text | url | password | number | time | select
   const char* group;    // "" = always shown, else only for that data source
-  const char* options;  // select only: "value:Label|value:Label"
+  const char* options;  // select: "value:Label|value:Label"; number: "min:max" (default 20:400)
   const char* def;
 };
 

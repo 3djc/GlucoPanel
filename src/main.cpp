@@ -7,6 +7,7 @@
 #include "glucose.h"
 #include "i18n.h"
 #include "input.h"
+#include "night.h"
 #include "ui.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"
@@ -111,6 +112,7 @@ void setup() {
 
 void loop() {
   handleInput();
+  nightTick();
   if (online) {
     configServerHandle();
     bool changed = configServerTakeChanged();

@@ -4,6 +4,7 @@
 #include "config.h"
 #include "i18n.h"
 #include "lvgl_port.h"
+#include "night.h"
 #include "profile.h"
 #include "ui.h"
 
@@ -49,6 +50,11 @@ void setError(const String& error) {
   String text = error.length() ? "! " + error : String();
   if (text != lv_label_get_text(errorLabel)) lv_label_set_text(errorLabel, text.c_str());  // keep refreshes small
 }
+
+bool night = false;
+
+// Dashboard screens (a reading, or no data yet) are inverted at night; screens with QR codes never are.
+bool invertWanted(Mode m) { return night && (m == MODE_READING || m == MODE_NO_DATA); }
 
 void updateCells() {
   for (Cell& c : cells) cellUpdate(c, view);
@@ -128,6 +134,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
   view.hba1cMmolMol = cfgGet("hba1c_unit") == "mmolmol";
 
   bool layoutChanged = shown.mode == MODE_NONE || mode != shown.mode || layout != shown.layout;
+  portSetInvert(invertWanted(mode));  // before the screen is (re)built, so its first frame already has the right colours
 
   if (mode == MODE_READING && !layoutChanged) {
     updateCells();  // each block only touches what changed
@@ -160,6 +167,7 @@ void drawDashboard(const Reading& last, const Deltas& d, const String& error,
 
 void dashboardShowConfig(const String& url, const String& code) {
   overlay = true;
+  portSetInvert(false);  // QR codes stay black on white
   lastArgs.url = url;  // the dashboard is redrawn with the new code when this screen closes
   lastArgs.code = code;
   uiShowConfigQr(url, code);
@@ -180,4 +188,13 @@ void dashboardTick() {
 
   updateCells();  // clock, reading age and freshness bar move with time
   portRefresh(false);
+}
+
+void dashboardSetNight(bool n) {
+  night = n;
+  bool want = !overlay && invertWanted(shown.mode);
+  if (want != portInverted()) {
+    portSetInvert(want);
+    portRefresh(true);  // redraw everything in the new colours (a full refresh on e-paper)
+  }
 }

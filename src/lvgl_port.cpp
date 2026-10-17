@@ -31,6 +31,10 @@ static void markDirty(const lv_area_t* area) {
   }
 }
 
+static bool inverted = false;
+void portSetInvert(bool invert) { inverted = invert; }
+bool portInverted() { return inverted; }
+
 static uint32_t tickCb() { return millis(); }
 
 // LVGL renders `bufferLines` screen lines at a time (partial render mode) into one RGB565 buffer.
@@ -56,7 +60,13 @@ static void createDisplay(int bufferLines, bool preferPsram, lv_display_flush_cb
 // portRefresh() pushes the frame buffer to the screen when something was drawn. A full frame takes
 // ~50 ms on the JC3248W535, so there is no partial / full refresh policy and no dithering.
 // ---------------------------------------------------------------------------------------------------
+void portSetBacklight(int percent) { panelBacklight(percent); }
+
 static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
+  if (inverted) {  // RGB565: ~c turns white into black and keeps greys grey
+    uint16_t* p = (uint16_t*)px;
+    for (int n = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1); n > 0; n--, p++) *p = ~*p;
+  }
   panelDraw(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (const uint16_t*)px);
   markDirty(area);
   lv_display_flush_ready(disp);
@@ -109,11 +119,12 @@ static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
       uint16_t c = *p;
       int ax = area->x1 + x, ay = area->y1 + y;
       bool black;
+      // Night mode inverts every pixel: the light grey band becomes dark grey = mostly black with sparse white dots.
       if (c == grey) {
-        black = bayer[ay & 3][ax & 3] < LIGHT_GREY_DOTS;
+        black = (bayer[ay & 3][ax & 3] < LIGHT_GREY_DOTS) != inverted;
       } else {
         uint32_t r = ((c >> 11) & 0x1F) * 255 / 31, g = ((c >> 5) & 0x3F) * 255 / 63, b = (c & 0x1F) * 255 / 31;
-        black = (r * 30 + g * 59 + b * 11) / 100 < BLACK_BELOW;
+        black = ((r * 30 + g * 59 + b * 11) / 100 < BLACK_BELOW) != inverted;
       }
       epaper.drawPixel(ax, ay, black ? TFT_BLACK : TFT_WHITE);
     }

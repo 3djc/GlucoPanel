@@ -303,9 +303,21 @@ static void handleSave() {
         return fail(fmt(T("%s must start with http:// or https://"), T(f.label)));
       while (v.endsWith("/")) v.remove(v.length() - 1);
     } else if (!strcmp(f.type, "number")) {
-      if (atoi(v.c_str()) < 20 || atoi(v.c_str()) > 400)
-        return fail(fmt(T("%s must be between 20 and 400"), T(f.label)));
+      int lo = 20, hi = 400;
+      if (f.options[0]) sscanf(f.options, "%d:%d", &lo, &hi);
+      if (atoi(v.c_str()) < lo || atoi(v.c_str()) > hi) {
+        char b[160];
+        snprintf(b, sizeof(b), T("%s must be between %d and %d"), T(f.label), lo, hi);
+        return fail(b);
+      }
       v = String(atoi(v.c_str()));
+    } else if (!strcmp(f.type, "time")) {  // HH:MM
+      int hh = -1, mm = -1;
+      if (sscanf(v.c_str(), "%d:%d", &hh, &mm) != 2 || hh < 0 || hh > 23 || mm < 0 || mm > 59)
+        return fail(fmt(T("%s must be a time (HH:MM)"), T(f.label)));
+      char b[8];
+      snprintf(b, sizeof(b), "%02d:%02d", hh, mm);
+      v = b;
     }
     vals[i] = v;
   }
