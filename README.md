@@ -1,11 +1,11 @@
 # GlucoPanel
 
-Glucose display firmware, built with PlatformIO, the Arduino framework and [LVGL](https://lvgl.io) 9.5 for the UI. It supports two displays (two *profiles* of the same code) and includes an SDL2 simulator for each, so you can develop without the device:
+Glucose display firmware for ESP32-S3 boards: it shows your current glucose, trend and statistics from Dexcom Share, LibreLinkUp or Nightscout. It supports two displays (two *profiles* of the same code):
 
-| Profile | Hardware | Screen | Input | PlatformIO environment |
-| --- | --- | --- | --- | --- |
-| e-paper (default) | Seeed **reTerminal E1001** (ESP32-S3) | 7.5" 800×480, black and white, partial refresh | two buttons on the back | `reterminal_e1001`, simulator `sim` |
-| colour LCD | Guition **JC3248W535** (ESP32-S3, 16 MB flash, 8 MB PSRAM) | 3.5" 480×320, colour, capacitive touch | touch screen | `jc3248w535`, simulator `sim_lcd` |
+| Profile | Hardware | Screen | Input |
+| --- | --- | --- | --- |
+| e-paper (default) | Seeed **reTerminal E1001** (ESP32-S3) | 7.5" 800×480, black and white, partial refresh | two buttons on the back |
+| colour LCD | Guition **JC3248W535** (ESP32-S3, 16 MB flash, 8 MB PSRAM) | 3.5" 480×320, colour, capacitive touch | touch screen |
 
 ![GlucoPanel dashboard in the simulator, with mock data](docs/screenshot.png)
 
@@ -76,11 +76,11 @@ Any of the six small blocks can show: nothing, the **glucose value** (big, with 
 
 *The layout editor on the settings page (here for the middle block): a miniature of the dashboard on top, and below it a preview of every choice for the block you tapped.*
 
-Deltas are in the chosen unit and show `--` until enough history is known; history comes from the same API calls (the last `GRAPH_HOURS` = 3 h from Dexcom and Nightscout, LibreLinkUp via its graph endpoint). The top row is a rounded light-grey band (like Gluco-Monitor's) with the three cells separated by thin lines and small captions above the numbers. The E1001's real 4-level gray mode has no partial refresh, so the grey is a sparse black/white dot pattern (`LIGHT_GREY_DOTS` in `src/lvgl_port.cpp`, 0 to 16 dots per 4×4 pixels). The graph shows the last 3 h as a line (dot on the newest reading), with the low..high thresholds as a light-grey band and the y range following the data (at least 60..200 mg/dL). Readings more than 20 min apart are not joined. A thin strip under it shows the last fetch error. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout). See `refreshMinutes()`.
+Deltas are in the chosen unit and show `--` until enough history is known. The graph shows the last 3 h as a line (dot on the newest reading), with the low..high thresholds as a light-grey band and the y range following the data (at least 60..200 mg/dL). Readings more than 20 min apart are not joined. A thin strip under it shows the last fetch error. The refresh interval is not a setting: it is fixed by the source (5 min for Dexcom, 1 min for LibreLinkUp and Nightscout).
 
-**Estimated HbA1c.** The block shows the *glucose management indicator* (GMI = 3.31 + 0.02392 × mean glucose in mg/dL, in %; mmol/mol = (% − 2.15) × 10.929). It is an estimate from sensor readings and can differ from a lab HbA1c by 0.5 % or more. Following the usual CGM rule it needs **14 days with at least 70 % of the readings**; until then the block says "Not available yet" and shows how many days of readings it has (for example "0.7 / 14 days"). Because that is far more than the RAM keeps, every reading is also added to per-day totals (seconds covered and glucose × seconds, 30 days, a few hundred bytes of text) saved in flash under the `hba1c` key every 30 min, so they survive a restart; a restart loses at most the last 30 min of counting, and gaps in the readings simply count as missing time. The totals belong to the account: they are discarded when the data source or its credentials (including the region) change.
+**Estimated HbA1c.** The block shows the *glucose management indicator* (GMI = 3.31 + 0.02392 × mean glucose in mg/dL, in %; mmol/mol = (% − 2.15) × 10.929). It is an estimate from sensor readings and can differ from a lab HbA1c by 0.5 % or more. Following the usual CGM rule it needs **14 days with at least 70 % of the readings**; until then the block says "Not available yet" and shows how many days of readings it has (for example "0.7 / 14 days"). Daily totals are saved in the panel's flash, so they survive a restart (at most the last 30 min of counting is lost), and gaps in the readings simply count as missing time. The totals belong to the account: they are discarded when the data source or its credentials (including the region) change.
 
-Saved values live in the ESP32's flash (NVS); read them with `cfgGet("key")`. Password fields are never echoed back, and leaving one blank keeps the stored value.
+Saved values live in the ESP32's flash. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
 **Access to the settings page.** The page needs a 6-digit **code that only the panel shows**: under the address on the "WiFi connected" and "Not configured" screens, and on the screen opened by a short press of the green button (a new code is made each time). The QR codes on those screens contain the code, so scanning one opens the page directly; otherwise open the address and type the code. A correct code starts a session (a cookie, 30 minutes after the last request); five wrong codes lock the page for a minute. Changing settings or erasing the WiFi therefore takes someone who can see the panel. The code is also printed on the serial console.
 
@@ -94,137 +94,10 @@ A night mode shows the dashboard **white on black**, set on the settings page (b
 - **How it is drawn:** the colours are inverted when the frame is pushed to the panel, so no widget needed changing. On the e-paper the light grey (a sparse dither) becomes dark grey (mostly black with sparse white dots), and the switch between day and night is a full refresh, twice a day for a schedule. The WiFi and settings screens keep their normal colours, so their QR codes stay easy to scan.
 - **Colour LCD only:** the backlight goes to **Night brightness** (default 10 %); **Brightness** (default 100 %) is the level the rest of the time. When the colours and the brightness both change, the colours change first and the brightness second, so the screen never flashes bright in a dark room. The e-paper has no backlight, so these two settings only exist on the LCD profile.
 
-## ePaper refresh policy
+## Install and build
 
-Full refreshes flash and wear the panel, so `src/lvgl_port.cpp` and `src/display.cpp` avoid them:
-
-- **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and every 30 minutes to clear ghosting (`FULL_REFRESH_MS`).
-- **Partial refresh** of one window covering just the blocks that changed (arrow, deltas, value), the "Updated N min ago" strip once a minute, and the error text.
-- **No refresh** when a fetch changes nothing, e.g. repeated identical errors.
-
-The sim logs every refresh (`epaper: FULL refresh` / `partial refresh`) so you can check this.
-
-## Data sources
-
-| Source | How it is read |
-| --- | --- |
-| Nightscout | `GET <url>/api/v1/entries/sgv.json?count=1`, optional `&token=` (an access token; the raw API secret is not supported) |
-| LibreLinkUp | `POST /llu/auth/login` (follows region redirects), then `GET /llu/connections` with `Authorization` and the SHA-256 `account-id` header; uses the first connection |
-| Dexcom Share | `AuthenticatePublisherAccount`, `LoginPublisherAccountById`, then `ReadPublisherLatestGlucoseValues`; uses a username (not a phone/email login) |
-
-LibreLinkUp and Dexcom Share are unofficial APIs and can change without notice. Sessions are cached and renewed on expiry. The clock is set over NTP because reading ages need it.
-
-**Server certificates.** HTTPS connections are checked against the root certificate list that is part of the ESP32 SDK (the Mozilla list, about 68 KB, already in the firmware), so a hostile network cannot pose as Dexcom, LibreLinkUp or your Nightscout and read your credentials. Certificates have validity dates, so this needs the clock to be right; the panel waits for NTP before the first fetch. I checked that Dexcom Share and all LibreLinkUp regions chain to roots that are in that list (GTS Root R4 / GlobalSign Root CA); I could not test the check on a real device. If your Nightscout runs on its own server with a **self-signed certificate**, set "Check server certificates" to No in the settings (this disables the check for every service, so prefer a normal certificate, or plain `http://` on a network you trust). A failed check shows as a fetch error such as "X509 - Certificate verification failed".
-
-## Build and flash
-
-Requires [PlatformIO](https://platformio.org/).
-
-```sh
-pio run -e reterminal_e1001               # build
-pio run -e reterminal_e1001 -t upload     # flash
-pio device monitor                        # serial, 115200 baud
-```
-
-For the colour LCD board use the `jc3248w535` environment instead:
-
-```sh
-pio run -e jc3248w535 -t upload           # build and flash over USB
-```
-
-Notes for the JC3248W535 (all verified on a real board with `tools/bringup_jc3248w535`):
-
-- It needs the pioarduino platform (Arduino core 3.x) and GFX Library for Arduino **1.6.9** (1.6.0 does not compile against core 3.3).
-- The environment sets `ARDUINO_USB_MODE=1`, so the chip's own USB-Serial-JTAG is used. With Arduino's TinyUSB serial instead, `esptool` cannot reset the chip and every upload would need the BOOT button.
-- The display is pushed as a full frame (~50 ms); some batches of this panel ignore partial window updates. Touch is read over I2C (address 0x3B); a touch counts as released after 150 ms without a point.
-- Pins: display QSPI 45, 47, 21, 48, 40, 39, backlight 1, touch SDA 4, SCL 8, INT 11, RST 12.
-- Before flashing a board that already runs something, you can keep a copy of its flash: `esptool read_flash 0 0x1000000 backup.bin` (it may contain your saved WiFi and account data, so keep it private).
-- `tools/bringup_jc3248w535/` is a small standalone test (colour bars, touch coordinates, a `B` serial command that reboots into the bootloader).
-
-`src/driver.h` selects the board and screen for the Seeed_GFX library (`BOARD_SCREEN_COMBO 520` = reTerminal E1001). For other boards see the [Seeed ePaper + PlatformIO guide](https://wiki.seeedstudio.com/epaper_work_with_platformio/).
-
-## Simulator
-
-The `sim` environment builds the same `src/` code for your computer, with an SDL2 window standing in for the ePaper and a small HTTP server standing in for the device's web server.
-
-```sh
-brew install sdl2            # macOS, once
-pio run -e sim -t exec        # e-paper profile (800x480)
-pio run -e sim_lcd -t exec    # colour LCD profile (480x320, click = touch)
-```
-
-- The window is 800×480. **Esc** or closing it quits.
-- **Enter** on the setup screen pretends the WiFi setup finished.
-- The settings page is at <http://localhost:8080>.
-- Keys **1** / **2** stand in for KEY0 / KEY1 (GPIO 3 / 4). Hold **1** for 3 s to see the WiFi erase.
-- `SIM_WIFI=fail` simulates saved WiFi that can't be joined.
-- Settings are saved in `.sim_prefs` (git-ignored).
-
-To exercise the data sources without real accounts, run the mock server and point the sim at it:
-
-```sh
-python3 tools/mock_cgm.py                                   # terminal 1
-SIM_API_BASE=http://localhost:9000 pio run -e sim -t exec   # terminal 2
-```
-
-Set `MOCK_PERIOD=2400` on the mock for a slow, realistic glucose curve (the default is a fast demo wave; the screenshot above was taken with it, with `SIM_SCREENSHOT`, so it shows mock data only). Set `MOCK_FREEZE=1` on the mock to keep one measurement time so the reading's age keeps growing. Mock credentials: Dexcom `user` / `pass`; LibreLinkUp `a@b.c` / `pass` (`redirect@test` tests the region redirect); Nightscout token `tok`, any URL. The sim client needs libcurl, which ships with macOS.
-
-Other variables:
-
-| Variable | Effect |
-| --- | --- |
-| `SIM_API_BASE=<url>` | Send every HTTP request to this base URL (see above) |
-| `SIM_NOWAIT=1` | Skip waiting for Enter on the setup screen |
-| `SIM_PRESS=<pin>` | Hold that button pin pressed (3 or 4) |
-| `SIM_TOUCH=<x>:<y>:<start ms>:<duration ms>[,...]` | LCD simulator: touch that point during each time window (the mouse also works) |
-| `SIM_TAP=<pin>:<start ms>:<duration ms>[,...]` | Press that button during each time window, e.g. `3:4000:300` is a short press at 4 s, `3:3000:4500` a long one |
-| `SIM_FRAMES=<n>` | Exit after `n` calls to `loop()` |
-| `SIM_SCREENSHOT=out_%d.bmp` | Save a BMP at every display update |
-
-The sim runs the same LVGL UI code as the device; only the panel (an SDL window) and the Arduino/WiFi layers are stand-ins. Limitations: ePaper refresh time and ghosting are not modelled; WiFi and touch are not simulated.
-
-## Layout
-
-```
-platformio.ini      environments: reterminal_e1001, jc3248w535 (devices), sim, sim_lcd (SDL2)
-include/lv_conf.h   LVGL configuration (device and sim)
-src/
-  main.cpp          setup/loop
-  driver.h          Seeed_GFX board selection
-  wifi_setup.*      saved-WiFi join, erase prompt, hotspot + QR codes
-  config.*          settings table and NVS storage
-  config_server.*   settings web page
-  glucose.*         Nightscout / LibreLinkUp / Dexcom fetchers
-  profile.*         per-profile table of every screen-dependent size and font (e-paper / LCD)
-  lvgl_port.*       LVGL <-> panel glue: e-paper: black/white + dither, full/partial refresh policy; LCD: frame push
-  panel.h, panel_axs15231b.cpp   LCD panel interface and the JC3248W535 driver (QSPI, backlight)
-  touch.h, touch_axs15231b.cpp   touch interface and the JC3248W535 driver (I2C)
-  input.*           one input layer: buttons (e-paper) or touch (LCD) -> tap / hold
-  ui.*              LVGL helpers and the WiFi screens (QR codes, prompts)
-  graph.*           glucose graph widget (line, low/high band, hour ticks)
-  i18n.*            translation table (T("English text")), month names, language setting
-  display.*         dashboard screen: mode switching, the grid of blocks
-  cells.*           what a block can show (value, arrow, deltas, clock, age, freshness bar, graph)
-  font_big_*.c      generated LVGL fonts for the glucose value (Montserrat Medium, digits only)
-  font_ui_*.c       generated LVGL fonts for all other text (Montserrat Medium, ASCII + Latin-1)
-  font_lcd_*.c      the same for the 480x320 colour profile (smaller sizes)
-  http.*            HTTP(S) client (device)
-sim/
-  sim_main.cpp      SDL2 host: e-paper window, or the colour LCD window with the mouse as touch screen
-  http_sim.cpp      HTTP client (libcurl)
-  include/          Arduino, WiFi, WebServer, Preferences... stand-ins
-tools/
-  mock_cgm.py       mock CGM services for the simulator
-```
-
-## Notes
-
-- Include order matters in `wifi_setup.cpp` and `config_server.cpp`: Seeed_GFX defines `FS_NO_GLOBALS`, which breaks `WebServer.h` if its headers come first.
-- Button pins (GPIO 3 and 4, active low) come from the [Seeed Arduino peripherals cookbook](https://wiki.seeedstudio.com/reterminal_e10xx_with_arduino_peripherals/); confirm them on your board.
-- The UI is LVGL 9.5 (pinned in `platformio.ini`; 9.6 changed some APIs). LVGL renders to RGB565, `src/lvgl_port.cpp` thresholds each pixel to black/white and writes it to the panel framebuffer. Only `UI_GREY` is dithered.
-- `src/font_big_96.c` and `src/font_big_128.c` were generated from Montserrat Medium (SIL OFL) with `lv_font_conv --size 128 --bpp 4 --no-compress --format lvgl --symbols "0123456789.-+"`. Regenerate them the same way to change the size.
-- **Languages.** The English text is the key of the translation table in `src/i18n.cpp`: `T("vs last")` returns the text in the chosen language, or the English text if there is no entry. To add a string, use `T()` where it is shown and add a row (fr, de, it, es) to the table; to add a language, add a column, a `Lang` value, a month row and an option in the `lang` field of `src/config.cpp`. Translations may only use ASCII and Latin-1 characters (accents of fr/de/it/es): that is what `font_ui_*.c` contains. For other scripts regenerate the fonts with more ranges, or with `--symbols`. The language is stored in flash like the other settings, so the WiFi screens at boot already use it (the very first boot is in English). Translations were written without a native-speaker review, corrections are welcome.
-- `font_ui_14/16/24/32.c` were generated with `lv_font_conv --size N --bpp 4 --no-compress --format lvgl -r 0x20-0x7F -r 0xA0-0xFF` from Montserrat Medium (SIL OFL); `font_ui_48.c` has the ASCII range only because it only shows numbers.
+- **Install a prebuilt firmware** on a device: [INSTALL.md](INSTALL.md).
+- **Build from source**, run the simulator, change the code: [BUILD.md](BUILD.md).
 
 ## License
 
