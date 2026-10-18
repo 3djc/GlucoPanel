@@ -9,6 +9,10 @@ Glucose display firmware for ESP32-S3 boards: it shows your current glucose, tre
 
 ![GlucoPanel dashboard in the simulator, with mock data](docs/screenshot.png)
 
+<p align="center"><img src="docs/device.png" alt="GlucoPanel running on a Guition JC3248W535 in night mode" width="480"></p>
+
+*On a real JC3248W535, in night mode.*
+
 ## Medical disclaimer
 
 **GlucoPanel is not a medical device.** It is a hobby project that shows glucose readings fetched from third-party services, and it has not been tested, certified or approved for any medical use.
