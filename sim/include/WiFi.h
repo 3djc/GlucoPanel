@@ -9,6 +9,8 @@
 extern bool sim_wifi_connected;  // sim_main.cpp
 
 struct IPAddress {
+  uint8_t o[4] = {0, 0, 0, 0};
+  uint8_t operator[](int i) const { return o[i]; }
   String toString() const { return "localhost:8080"; /* sim web server address */ }
 };
 

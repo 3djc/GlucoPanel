@@ -19,6 +19,7 @@ static bool settingsChanged = false;
 // so changing settings takes someone who can see the panel. A valid code starts a session (a cookie, 30 min
 // since the last request). Wrong codes are rate limited. This keeps other devices on the network out; the
 // page itself is still plain HTTP, so it does not protect against someone who can read your WiFi traffic.
+// Addresses listed under "Trusted IP addresses" skip the code (see trustedClient()).
 static const unsigned long SESSION_MS = 30UL * 60UL * 1000UL, LOCKOUT_MS = 60UL * 1000UL;
 static const int MAX_FAILURES = 5;
 static String configCode, sessionToken;
@@ -35,7 +36,52 @@ String configServerCode() { return configCode.length() ? configCode : configServ
 
 static bool before(unsigned long now, unsigned long deadline) { return (long)(deadline - now) > 0; }  // millis() wraps
 
+// ---- trusted addresses ----
+// Optional list of IPv4 addresses or ranges (a.b.c.d or a.b.c.d/n, separated by commas or spaces) that need no code.
+// An address on the local network can be impersonated by another device there, so only list machines you trust.
+struct IpRule { uint32_t net, mask; };
+
+// Parses `list` into `rules` (at most `max`); returns the count, or -1 if an entry is malformed. Prefixes shorter than
+// /8 are refused so that a typo cannot open the page to everybody.
+static int parseIpList(const String& list, IpRule* rules, int max) {
+  int n = 0;
+  int i = 0, len = list.length();
+  while (i < len) {
+    while (i < len && (list[i] == ',' || list[i] == ' ')) i++;
+    if (i >= len) break;
+    String tok;
+    while (i < len && list[i] != ',' && list[i] != ' ') tok += list[i++];
+    int a, b, c, d, bits = 32, used = 0;
+    if (sscanf(tok.c_str(), "%d.%d.%d.%d%n", &a, &b, &c, &d, &used) != 4) return -1;
+    if (a < 0 || a > 255 || b < 0 || b > 255 || c < 0 || c > 255 || d < 0 || d > 255) return -1;
+    if (tok[used] == '/') {
+      char* end;
+      bits = strtol(tok.c_str() + used + 1, &end, 10);
+      if (*end || bits < 8 || bits > 32) return -1;
+    } else if (tok[used]) {
+      return -1;
+    }
+    if (n >= max) return -1;
+    uint32_t mask = bits == 32 ? 0xFFFFFFFFu : ~(0xFFFFFFFFu >> bits);
+    rules[n++] = {(((uint32_t)a << 24) | (b << 16) | (c << 8) | d) & mask, mask};
+  }
+  return n;
+}
+
+static bool trustedClient() {
+  String list = cfgGet("trusted_ips");
+  if (!list.length()) return false;
+  IpRule rules[8];
+  int n = parseIpList(list, rules, 8);
+  IPAddress ip = server.client().remoteIP();
+  uint32_t addr = ((uint32_t)ip[0] << 24) | ((uint32_t)ip[1] << 16) | ((uint32_t)ip[2] << 8) | ip[3];
+  for (int i = 0; i < n; i++)
+    if ((addr & rules[i].mask) == rules[i].net) return true;
+  return false;
+}
+
 static bool authorized() {
+  if (trustedClient()) return true;
   unsigned long now = millis();
   if (!sessionToken.length() || !before(now, sessionUntil)) return false;
   if (server.header("Cookie").indexOf(String("gp=") + sessionToken) < 0) return false;
@@ -268,7 +314,7 @@ static void handleRoot() {
 }
 
 static String fmt(const char* f, const char* a) {
-  char b[200];
+  char b[320];
   snprintf(b, sizeof(b), f, a);
   return b;
 }
@@ -311,6 +357,10 @@ static void handleSave() {
         return fail(b);
       }
       v = String(atoi(v.c_str()));
+    } else if (!strcmp(f.key, "trusted_ips") && v.length()) {
+      IpRule rules[8];
+      if (parseIpList(v, rules, 8) < 0)
+        return fail(fmt(T("%s: use IPv4 addresses or ranges such as 192.168.1.20 or 192.168.1.0/24 (at most 8, ranges /8 to /32)"), T(f.label)));
     } else if (!strcmp(f.type, "time")) {  // HH:MM
       int hh = -1, mm = -1;
       if (sscanf(v.c_str(), "%d:%d", &hh, &mm) != 2 || hh < 0 || hh > 23 || mm < 0 || mm > 59)

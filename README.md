@@ -58,6 +58,7 @@ Open the address shown on the display from any device on the same network.
 | Display unit | mg/dL or mmol/L |
 | Block contents | What each of the seven blocks shows (see below) |
 | HbA1c unit | % (NGSP, default) or mmol/mol (IFCC) for the estimated HbA1c block |
+| Trusted IP addresses | Optional list of IPv4 addresses or ranges (`192.168.1.20`, `192.168.1.0/24`, separated by commas) whose requests skip the code. See the access note below |
 | Check server certificates | Yes (default): HTTPS servers must present a certificate signed by a known authority. No: accept any certificate (insecure) |
 | Night mode, Night starts / ends at | White-on-black dashboard, always on or on a schedule (see below) |
 | Brightness, Night brightness | Backlight levels, colour LCD only |
@@ -87,6 +88,8 @@ Deltas are in the chosen unit and show `--` until enough history is known. The g
 Saved values live in the ESP32's flash. Password fields are never echoed back, and leaving one blank keeps the stored value.
 
 **Access to the settings page.** The page needs a 6-digit **code that only the panel shows**: under the address on the "WiFi connected" and "Not configured" screens, and on the screen opened by a short press of the green button (a new code is made each time). The QR codes on those screens contain the code, so scanning one opens the page directly; otherwise open the address and type the code. A correct code starts a session (a cookie, 30 minutes after the last request); five wrong codes lock the page for a minute. Changing settings or erasing the WiFi therefore takes someone who can see the panel. The code is also printed on the serial console.
+
+**Trusted IP addresses.** Addresses listed in that setting reach the page without a code or session (up to 8 entries, ranges from /8 to /32). Use it for a machine you control, ideally with a fixed address (a DHCP reservation). Another device on the same WiFi can claim the same address, so this trades some of the protection above for convenience; leave it empty if you do not need it. Only someone who already has access (a code, or a trusted address) can change the list.
 
 What this does **not** do: the page is still plain HTTP, so someone who can read your WiFi traffic can see the code and the session cookie; and secrets (the WiFi password, the service credentials) are stored unencrypted in the ESP32's flash, readable by someone with physical access and a cable. Flash encryption would fix the latter, but it is irreversible and makes development harder, so it is not used.
 

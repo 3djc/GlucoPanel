@@ -2,6 +2,7 @@
 // Listens on 127.0.0.1:8080 (ports below 1024 are remapped).
 #pragma once
 #include <Arduino.h>
+#include <WiFi.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -40,8 +41,12 @@ class WebServer {
   }
 
   void handleClient() {
-    int c = accept(fd_, nullptr, nullptr);
+    sockaddr_in peer{};
+    socklen_t peerLen = sizeof(peer);
+    int c = accept(fd_, (sockaddr*)&peer, &peerLen);
     if (c < 0) return;
+    uint32_t pa = ntohl(peer.sin_addr.s_addr);
+    for (int i = 0; i < 4; i++) remote_.o[i] = pa >> (24 - 8 * i);
     fcntl(c, F_SETFL, fcntl(c, F_GETFL) & ~O_NONBLOCK);  // accepted sockets inherit O_NONBLOCK on macOS
     timeval tv{0, 300000};
     setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -101,6 +106,12 @@ class WebServer {
     close(c);
   }
 
+  struct Client {
+    IPAddress ip;
+    IPAddress remoteIP() const { return ip; }
+  };
+  Client client() { return {remote_}; }
+
   String arg(const char* name) {
     auto it = args_.find(name);
     return it == args_.end() ? String() : String(it->second);
@@ -144,6 +155,7 @@ class WebServer {
   std::map<std::string, std::string> args_, reqHeaders_;
   std::vector<std::string> wanted_;
   std::string hdrs_;
+  IPAddress remote_;
   int port_, fd_ = -1, cur_ = -1;
 
   static std::string urldecode(const std::string& s) {

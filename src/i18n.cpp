@@ -97,6 +97,8 @@ const Entry TABLE[] = {
     {"Server", {"Serveur", "Server", "Server", "Servidor"}},
     {"Display unit", {"Unité d'affichage", "Anzeigeeinheit", "Unità di visualizzazione", "Unidad de visualización"}},
     {"Time zone", {"Fuseau horaire", "Zeitzone", "Fuso orario", "Zona horaria"}},
+    {"Trusted IP addresses (no code needed)", {"Adresses IP de confiance (sans code)", "Vertrauenswürdige IP-Adressen (ohne Code)", "Indirizzi IP fidati (senza codice)", "Direcciones IP de confianza (sin código)"}},
+    {"%s: use IPv4 addresses or ranges such as 192.168.1.20 or 192.168.1.0/24 (at most 8, ranges /8 to /32)", {"%s : adresses IPv4 ou plages, par ex. 192.168.1.20 ou 192.168.1.0/24 (8 au plus, plages /8 à /32)", "%s: IPv4-Adressen oder Bereiche wie 192.168.1.20 oder 192.168.1.0/24 (höchstens 8, Bereiche /8 bis /32)", "%s: indirizzi IPv4 o intervalli come 192.168.1.20 o 192.168.1.0/24 (al massimo 8, intervalli da /8 a /32)", "%s: direcciones IPv4 o rangos como 192.168.1.20 o 192.168.1.0/24 (como máximo 8, rangos de /8 a /32)"}},
     {"Check server certificates", {"Vérifier les certificats des serveurs", "Serverzertifikate prüfen", "Verifica i certificati dei server", "Verificar los certificados de los servidores"}},
     {"Yes (recommended)", {"Oui (recommandé)", "Ja (empfohlen)", "Sì (consigliato)", "Sí (recomendado)"}},
     {"No (insecure)", {"Non (non sécurisé)", "Nein (unsicher)", "No (non sicuro)", "No (inseguro)"}},
