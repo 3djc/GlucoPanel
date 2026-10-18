@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #define WIFI_STA 1
+#define WIFI_PS_MIN_MODEM 1
 #define WL_CONNECTED 3
 #define WL_DISCONNECTED 6
 
@@ -16,6 +17,7 @@ struct IPAddress {
 
 struct WiFiShim {
   void mode(int) {}
+  void setSleep(int) {}
   void begin() {}
   int status() const { return sim_wifi_connected ? WL_CONNECTED : WL_DISCONNECTED; }
   String SSID() const { return "SimNetwork"; }

@@ -44,6 +44,8 @@ struct EspShim {
 };
 static EspShim ESP;
 
+inline bool setCpuFrequencyMhz(unsigned long) { return true; }
+
 #define INPUT 0
 #define INPUT_PULLUP 2
 #define HIGH 1

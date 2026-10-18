@@ -98,12 +98,14 @@ static void refresh() {
 }
 
 void setup() {
+  setCpuFrequencyMhz(160);  // plenty for a dashboard that updates once a minute (default 240 MHz)
   Serial.begin(115200);
   i18nReload();  // the saved language applies from the first screen
   portBegin();
   inputBegin();
   online = wifiConnect();
   if (online) {
+    WiFi.setSleep(WIFI_PS_MIN_MODEM);  // radio sleeps between beacons; the settings page is a little slower
     glucoseInit();
     configServerBegin();
     Serial.printf("settings code: %s\n", configServerCode().c_str());
@@ -120,5 +122,5 @@ void loop() {
     if (changed || millis() >= nextFetch) refresh();
     dashboardTick();
   }
-  delay(2);
+  delay(10);  // idle the CPU between polls; touch, buttons and the web server stay responsive
 }
