@@ -289,7 +289,7 @@ void updateHba1c(Cell& c, const CellView& v) {
 
 CellType cellTypeFromString(const String& s) {
   static const struct { const char* name; CellType type; } table[] = {
-      {"value", CELL_VALUE}, {"arrow", CELL_ARROW}, {"delta1", CELL_DELTA1}, {"delta15", CELL_DELTA15},
+      {"value", CELL_VALUE}, {"arrow", CELL_ARROW}, {"delta1", CELL_DELTA1}, {"delta15", CELL_DELTA15}, {"delta30", CELL_DELTA30},
       {"clock", CELL_CLOCK}, {"readtime", CELL_READTIME}, {"age", CELL_AGE}, {"fresh", CELL_FRESH},
       {"avg", CELL_AVG}, {"tir", CELL_TIR}, {"range", CELL_RANGE}, {"cv", CELL_CV}, {"hba1c", CELL_HBA1C}, {"graph", CELL_GRAPH}};
   for (const auto& e : table)
@@ -306,6 +306,7 @@ void cellBuild(Cell& c) {
     case CELL_ARROW: buildArrow(c); break;
     case CELL_DELTA1: buildCaptioned(c, T("vs last")); break;
     case CELL_DELTA15: buildCaptioned(c, T("vs 15 min")); break;
+    case CELL_DELTA30: buildCaptioned(c, T("vs 30 min")); break;
     case CELL_CLOCK: buildClock(c); break;
     case CELL_READTIME: buildCaptioned(c, T("reading time")); break;
     case CELL_AGE: buildCaptioned(c, T("reading age")); break;
@@ -329,6 +330,7 @@ void cellUpdate(Cell& c, const CellView& v) {
     case CELL_ARROW: updateArrow(c, v); break;
     case CELL_DELTA1: setText(c.a, deltaText(v.deltas.has1, v.deltas.d1, v.mmol).c_str()); break;
     case CELL_DELTA15: setText(c.a, deltaText(v.deltas.has15, v.deltas.d15, v.mmol).c_str()); break;
+    case CELL_DELTA30: setText(c.a, deltaText(v.deltas.has30, v.deltas.d30, v.mmol).c_str()); break;
     case CELL_CLOCK: updateClock(c); break;
     case CELL_READTIME: updateReadTime(c, v); break;
     case CELL_AGE: updateAge(c, v); break;

@@ -21,11 +21,11 @@ struct FetchResult {
   String error;
 };
 
-// Changes in mg/dL of the latest reading vs the previous one and vs ~15 min earlier,
+// Changes in mg/dL of the latest reading vs the previous one and vs ~15 and ~30 min earlier,
 // computed from the readings collected by recent fetches (cleared when the source changes).
 struct Deltas {
-  bool has1 = false, has15 = false;
-  int d1 = 0, d15 = 0;
+  bool has1 = false, has15 = false, has30 = false;
+  int d1 = 0, d15 = 0, d30 = 0;
 };
 Deltas glucoseDeltas(const Reading& latest);
 

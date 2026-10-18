@@ -3,7 +3,7 @@
 
 // What a dashboard block can show (see cells.h).
 #define BLOCK_OPTIONS \
-  "none:Empty|value:Glucose value|arrow:Trend arrow|delta1:Change vs last reading|delta15:Change vs 15 min ago|" \
+  "none:Empty|value:Glucose value|arrow:Trend arrow|delta1:Change vs last reading|delta15:Change vs 15 min ago|delta30:Change vs 30 min ago|" \
   "clock:Date and time|readtime:Time of the reading|age:Age of the reading|fresh:Freshness bar|" \
   "avg:Average glucose|tir:Time in range|range:Lowest and highest|cv:Variability (CV)|hba1c:Estimated HbA1c"
 

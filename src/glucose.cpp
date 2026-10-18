@@ -211,19 +211,22 @@ Deltas glucoseDeltas(const Reading& latest) {
   Deltas d;
   if (!latest.valid) return d;
   const time_t TOLERANCE = 450;  // 7.5 min: graph points can be 15 min apart
-  time_t target = latest.when - 15 * 60;
+  time_t target = latest.when - 15 * 60, target30 = latest.when - 30 * 60;
   const Reading* prev = nullptr;
   const Reading* ago = nullptr;
+  const Reading* ago30 = nullptr;
+  auto dist = [](const Reading* r, time_t t) { return r->when > t ? r->when - t : t - r->when; };
   for (int i = 0; i < histN; i++) {
     const Reading& h = hist[i];
     if (h.when >= latest.when) continue;
     if (latest.when - h.when < 120) continue;  // Dexcom often returns the same measurement twice, seconds apart
     prev = &h;  // ascending, so the last one older than that wins
-    time_t diff = h.when > target ? h.when - target : target - h.when;
-    if (diff <= TOLERANCE && (!ago || diff < (ago->when > target ? ago->when - target : target - ago->when))) ago = &h;
+    if (dist(&h, target) <= TOLERANCE && (!ago || dist(&h, target) < dist(ago, target))) ago = &h;
+    if (dist(&h, target30) <= TOLERANCE && (!ago30 || dist(&h, target30) < dist(ago30, target30))) ago30 = &h;
   }
   if (prev && latest.when - prev->when <= 30 * 60) { d.has1 = true; d.d1 = latest.mgdl - prev->mgdl; }
   if (ago) { d.has15 = true; d.d15 = latest.mgdl - ago->mgdl; }
+  if (ago30) { d.has30 = true; d.d30 = latest.mgdl - ago30->mgdl; }
   return d;
 }
 

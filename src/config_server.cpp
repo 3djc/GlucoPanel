@@ -162,7 +162,7 @@ static String editorTexts() {
   sample.tm_mday = 17;
   sample.tm_mon = 9;
   String d = i18nDate(sample);
-  return String("const L={vs1:'") + jsq(T("vs last")) + "',vs15:'" + jsq(T("vs 15 min")) + "',rt:'" + jsq(T("reading time")) +
+  return String("const L={vs1:'") + jsq(T("vs last")) + "',vs15:'" + jsq(T("vs 15 min")) + "',vs30:'" + jsq(T("vs 30 min")) + "',rt:'" + jsq(T("reading time")) +
          "',ra:'" + jsq(T("reading age")) + "',min:'" + jsq(T("%d min")) + "',avg:'" + jsq(T("average")) + "',inr:'" + jsq(T("in range")) +
          "',mm:'" + jsq(T("lowest / highest")) + "',var:'" + jsq(T("variability")) + "',low:'" + jsq(T("low")) + "',high:'" + jsq(T("high")) +
          "',sd:'" + jsq(T("SD")) + "',empty:'" + jsq(T("empty")) + "',tap:'" + jsq(T("Tap a block, then pick what it shows.")) +
@@ -210,12 +210,13 @@ if(!dash||sel.some(x=>!x))return;
 fb.style.display='none';
 const unit=document.querySelector('[name=unit]');
 function pv(t){
- const hu=document.querySelector('[name=hba1c_unit]'),PCT=!hu||hu.value=='percent',mm=unit&&unit.value=='mmol',v=mm?'7.1':'128',u=mm?'mmol/L':'mg/dL',d1=mm?'-0.3':'-5',d15=mm?'+0.6':'+11';
+ const hu=document.querySelector('[name=hba1c_unit]'),PCT=!hu||hu.value=='percent',mm=unit&&unit.value=='mmol',v=mm?'7.1':'128',u=mm?'mmol/L':'mg/dL',d1=mm?'-0.3':'-5',d15=mm?'+0.6':'+11',d30=mm?'+1.1':'+20';
  switch(t){
  case 'value':return '<b class=big>'+v+'</b><i class=unit>'+u+'</i>';
  case 'arrow':return '<svg class=ar viewBox="-50 -50 100 100"><g transform="rotate(45)"><rect x="-45" y="-3" width="62" height="6"/><polygon points="45,0 14,-25 14,25"/></g></svg>';
  case 'delta1':return '<i class=cap>'+L.vs1+'</i><b class=num>'+d1+'</b>';
  case 'delta15':return '<i class=cap>'+L.vs15+'</i><b class=num>'+d15+'</b>';
+ case 'delta30':return '<i class=cap>'+L.vs30+'</i><b class=num>'+d30+'</b>';
  case 'clock':return '<i class=date>'+L.date+'</i><b class=num>09:52</b>';
  case 'readtime':return '<i class=cap>'+L.rt+'</i><b class=num>09:50</b>';
  case 'age':return '<i class=cap>'+L.ra+'</i><b class=num>'+L.min.replace('%d',2)+'</b>';

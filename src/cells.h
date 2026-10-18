@@ -12,6 +12,7 @@ enum CellType {
   CELL_ARROW,      // trend arrow
   CELL_DELTA1,     // change vs the previous reading
   CELL_DELTA15,    // change vs 15 min ago
+  CELL_DELTA30,    // change vs 30 min ago
   CELL_CLOCK,      // current date and time
   CELL_READTIME,   // time the reading was taken
   CELL_AGE,        // how old the reading is, in minutes
