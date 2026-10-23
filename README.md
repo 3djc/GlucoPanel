@@ -105,14 +105,13 @@ A night mode shows the dashboard **white on black**, set on the settings page (b
 
 ## Firmware updates
 
-The panel can update itself over WiFi from the [GitHub releases](https://github.com/3djc/GlucoPanel/releases) of this project. It is on by default; the **Install updates automatically** setting turns it off, and then the panel makes no update requests at all.
+The panel can update itself over WiFi with the latest [release](https://github.com/3djc/GlucoPanel/releases) of this project. It is on by default. Turn off **Install updates automatically** in the settings if you prefer to update by hand; the panel then makes no update requests at all.
 
-- **Checking:** about 90 s after start-up and then once a day, the panel reads `manifest.json` of the latest release (a few hundred bytes). It also looks once more when the install hour starts.
-- **Installing:** a newer release is installed during the hour set by **Install updates at** (default 03:00 to 03:59 in your time zone), and only while the settings screen is closed and no fetch error is showing. The download takes 20 to 40 s, during which the screen shows the progress and the panel does not update the reading, then it restarts. Your settings and WiFi are kept.
-- **Safety:** the download is HTTPS with the certificate checked (whatever the "Check server certificates" setting says), the update address must be on `github.com` (which then redirects to its own download servers), and the size and SHA-256 must match the manifest before it is accepted. The new firmware is installed in the second of two app slots; if it does not run for a minute with WiFi connected, the next restart goes back to the previous firmware. A release that fails to install 3 nights in a row is left alone until a newer one appears.
-- **By hand:** the **Firmware updates** block of the settings page shows the version and has **Check for updates** and **Install now** buttons, which work whatever the automatic setting says. Flashing an `-update.bin` over USB (see [INSTALL.md](INSTALL.md#updating)) still works too.
-- **Not covered:** the manifest is protected by HTTPS and your trust in GitHub, not by a signature of its own. Someone who can publish a release in this repository can update every panel.
-- **Development builds** report the version `dev` and are never replaced by an automatic update; only builds made from a release tag (`v1.2.3`) take part.
+- **When:** the panel looks for a new release about once a day and installs it during one hour of the night, **03:00 to 03:59** unless you change **Install updates at**. It waits if the settings screen is open or an error is showing.
+- **What you see:** the screen shows "Updating the firmware" with a percentage for 20 to 40 seconds, then the panel restarts by itself. Do not unplug it meanwhile. Your WiFi and settings are kept.
+- **Safe by design:** the download is checked before it is used, and if the new version does not start properly the panel goes back to the previous one. A release that cannot be installed 3 nights in a row is skipped until a newer one comes out.
+- **By hand:** the **Firmware updates** block at the bottom of the settings page shows the installed version and has **Check for updates** and **Install now** buttons, which work whatever the automatic setting says. You can also flash an update over USB (see [INSTALL.md](INSTALL.md#updating)).
+- **Trust:** updates come from this project's GitHub releases and are not signed separately, so anyone who can publish a release there can update your panel.
 
 ## Install and build
 
