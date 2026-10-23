@@ -8,7 +8,9 @@
 #include "i18n.h"
 #include "input.h"
 #include "night.h"
+#include "ota.h"
 #include "ui.h"
+#include "version.h"
 #include "lvgl_port.h"
 #include "wifi_setup.h"
 
@@ -100,6 +102,7 @@ static void refresh() {
 void setup() {
   setCpuFrequencyMhz(160);  // plenty for a dashboard that updates once a minute (default 240 MHz)
   Serial.begin(115200);
+  Serial.printf("GlucoPanel %s (%s)\n", FW_VERSION, BOARD_ID);
   i18nReload();  // the saved language applies from the first screen
   portBegin();
   inputBegin();
@@ -121,6 +124,7 @@ void loop() {
     if (changed) lastGood = Reading();  // new source/credentials: drop the old reading
     if (changed || millis() >= nextFetch) refresh();
     dashboardTick();
+    otaTick(!configShown && lastError.length() == 0);
   }
   delay(10);  // idle the CPU between polls; touch, buttons and the web server stay responsive
 }

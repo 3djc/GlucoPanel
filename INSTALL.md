@@ -99,7 +99,9 @@ If the saved WiFi cannot be joined at boot, the device asks whether to erase it 
 
 ## Updating
 
-Flash the `-update.bin` of the new release at `0x10000`. Your settings live in a separate flash area and are kept. (Flashing a `-full.bin` erases them.)
+**Automatically.** A panel running this version or later updates itself: once a day it looks for a newer release on GitHub and installs it at night (03:00 by default), keeping your settings. Nothing to do, and you can switch it off or install at once in the settings page ([README](README.md#firmware-updates)). The first install of such a version has to be done over USB; versions older than that cannot update themselves.
+
+**Over USB.** Flash the `-update.bin` of the new release at `0x10000`. Your settings live in a separate flash area and are kept. (Flashing a `-full.bin` erases them.)
 
 ## Troubleshooting
 
@@ -108,4 +110,5 @@ Flash the `-update.bin` of the new release at `0x10000`. Your settings live in a
 - **Cannot reach `glucopanel.local`.** Some networks and Windows setups do not resolve `.local` names; use the IP address shown on the device.
 - **"Certificate verification failed" shown as an error.** The device checks HTTPS servers against its built-in root list and needs the correct time, which it gets over NTP. If your Nightscout uses a self-signed certificate, set "Check server certificates" to No in the settings.
 - **Forgot the settings code or lost the page.** Short press the green button, or tap the screen, to get a new code and QR code.
+- **The panel does not update.** Open the settings page: the **Firmware updates** block shows the version and the result of the last check (a failure says why, for example the clock is not set yet or GitHub cannot be reached). Updates need the panel to be on at the install hour and no fetch error showing then. **Check for updates** and **Install now** work at any time.
 - **Start over completely.** Erase the WiFi as above; to wipe everything, run `esptool --chip esp32s3 erase-flash` and flash the `-full.bin` again.

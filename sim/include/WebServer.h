@@ -109,6 +109,7 @@ class WebServer {
   struct Client {
     IPAddress ip;
     IPAddress remoteIP() const { return ip; }
+    void stop() {}  // the sim answers each request on its own connection
   };
   Client client() { return {remote_}; }
 

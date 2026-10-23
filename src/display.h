@@ -14,6 +14,9 @@ void drawDashboard(const Reading& last, const Deltas& deltas, const String& erro
 void dashboardShowConfig(const String& url, const String& code);
 void dashboardHideConfig();
 
+// The firmware update screen (ota.cpp) also replaces the dashboard; dashboardHideConfig() brings it back.
+void dashboardShowUpdate(int percent);
+
 // Night mode: shows the dashboard white on black while `night` is true (night.cpp). The WiFi and
 // settings screens keep their normal colours so that their QR codes stay easy to scan.
 void dashboardSetNight(bool night);

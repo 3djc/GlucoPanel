@@ -28,6 +28,8 @@ jobs:
           key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
       - run: pip install platformio esptool==5.4.0
       - run: pio run -e ${{ matrix.env }}
+        env:
+          FW_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
       - run: tools/package_release.sh ${{ matrix.env }} ${{ matrix.name }} dist
       - uses: actions/upload-artifact@v4
         with:
@@ -41,12 +43,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum *.bin > SHA256SUMS.txt
+      - name: Manifest
+        # What the devices fetch to find the newest version: .../releases/latest/download/manifest.json
+        run: python3 tools/make_manifest.py dist "${{ github.ref_name }}" "${{ github.repository }}"
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

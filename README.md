@@ -60,11 +60,13 @@ Open the address shown on the display from any device on the same network.
 | HbA1c unit | % (NGSP, default) or mmol/mol (IFCC) for the estimated HbA1c block |
 | Trusted IP addresses | Optional list of IPv4 addresses or ranges (`192.168.1.20`, `192.168.1.0/24`, separated by commas) whose requests skip the code. See the access note below |
 | Check server certificates | Yes (default): HTTPS servers must present a certificate signed by a known authority. No: accept any certificate (insecure) |
+| Install updates automatically, Install updates at | Automatic firmware updates from GitHub, On by default, and the hour of the night to install them (default 3, local time). See [Firmware updates](#firmware-updates) |
 | Night mode, Night starts / ends at | White-on-black dashboard, always on or on a schedule (see below) |
 | Brightness, Night brightness | Backlight levels, colour LCD only |
 | Language | English (default), Français, Deutsch, Italiano or Español: the panel screens, the fetch errors and this page |
 | Time zone | Used for the HH:MM clock on the dashboard (default Paris / Berlin / Madrid) |
 | Low / high thresholds | Always entered in mg/dL; low must be below high |
+| Firmware updates | The running version, the result of the last check, a **Check for updates** button and, when there is a newer release, an **Install now** button |
 | Erase WiFi | Wipes the saved network and reboots into the `GlucoPanel` hotspot |
 
 The panel then shows the dashboard and refetches on a timer. The screen is a grid of seven blocks (no grid lines are drawn), and **each block's content is chosen in the settings page**, on a miniature of the dashboard: tap a block, then tap one of the preview cards to choose what it shows (plain drop-downs are used if JavaScript is off):
@@ -100,6 +102,17 @@ A night mode shows the dashboard **white on black**, set on the settings page (b
 - **Night mode:** Off, On, or Scheduled. Scheduled uses **Night starts at** and **Night ends at** in your time zone; the night may run over midnight (for example 22:00 to 07:00). Until the clock is set (NTP) the schedule counts as day. The settings are looked at every couple of seconds, so a change made on the page shows within moments.
 - **How it is drawn:** the colours are inverted when the frame is pushed to the panel, so no widget needed changing. On the e-paper the light grey (a sparse dither) becomes dark grey (mostly black with sparse white dots), and the switch between day and night is a full refresh, twice a day for a schedule. The WiFi and settings screens keep their normal colours, so their QR codes stay easy to scan.
 - **Colour LCD only:** the backlight goes to **Night brightness** (default 10 %); **Brightness** (default 100 %) is the level the rest of the time. When the colours and the brightness both change, the colours change first and the brightness second, so the screen never flashes bright in a dark room. The e-paper has no backlight, so these two settings only exist on the LCD profile.
+
+## Firmware updates
+
+The panel can update itself over WiFi from the [GitHub releases](https://github.com/3djc/GlucoPanel/releases) of this project. It is on by default; the **Install updates automatically** setting turns it off, and then the panel makes no update requests at all.
+
+- **Checking:** about 90 s after start-up and then once a day, the panel reads `manifest.json` of the latest release (a few hundred bytes). It also looks once more when the install hour starts.
+- **Installing:** a newer release is installed during the hour set by **Install updates at** (default 03:00 to 03:59 in your time zone), and only while the settings screen is closed and no fetch error is showing. The download takes 20 to 40 s, during which the screen shows the progress and the panel does not update the reading, then it restarts. Your settings and WiFi are kept.
+- **Safety:** the download is HTTPS with the certificate checked (whatever the "Check server certificates" setting says), the update address must be on `github.com` (which then redirects to its own download servers), and the size and SHA-256 must match the manifest before it is accepted. The new firmware is installed in the second of two app slots; if it does not run for a minute with WiFi connected, the next restart goes back to the previous firmware. A release that fails to install 3 nights in a row is left alone until a newer one appears.
+- **By hand:** the **Firmware updates** block of the settings page shows the version and has **Check for updates** and **Install now** buttons, which work whatever the automatic setting says. Flashing an `-update.bin` over USB (see [INSTALL.md](INSTALL.md#updating)) still works too.
+- **Not covered:** the manifest is protected by HTTPS and your trust in GitHub, not by a signature of its own. Someone who can publish a release in this repository can update every panel.
+- **Development builds** report the version `dev` and are never replaced by an automatic update; only builds made from a release tag (`v1.2.3`) take part.
 
 ## Install and build
 

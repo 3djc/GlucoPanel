@@ -28,6 +28,8 @@ const ConfigField CONFIG_FIELDS[] = {
   {"hba1c_unit", "HbA1c unit", "select", "", "percent:% (NGSP)|mmolmol:mmol/mol (IFCC)", "percent"},
   {"trusted_ips", "Trusted IP addresses (no code needed)", "text", "", "", ""},
   {"tls_verify", "Check server certificates", "select", "", "on:Yes (recommended)|off:No (insecure)", "on"},
+  {"auto_update", "Install updates automatically", "select", "", "on:On|off:Off", "on"},
+  {"update_hour", "Install updates at (hour, 0-23)", "number", "", "0:23", "3"},
   {"tz", "Time zone", "select", "",
    "UTC0:UTC|GMT0BST,M3.5.0/1,M10.5.0:London|CET-1CEST,M3.5.0,M10.5.0/3:Paris / Berlin / Madrid|EET-2EEST,M3.5.0/3,M10.5.0/4:Helsinki / Athens|"
    "EST5EDT,M3.2.0,M11.1.0:New York|CST6CDT,M3.2.0,M11.1.0:Chicago|MST7MDT,M3.2.0,M11.1.0:Denver|PST8PDT,M3.2.0,M11.1.0:Los Angeles|"

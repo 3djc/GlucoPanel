@@ -197,6 +197,22 @@ void uiShowWifiErased() {
   portRefresh(true);
 }
 
+void uiShowUpdate(int percent) {
+  static lv_obj_t* pct = nullptr;
+  char text[16];
+  snprintf(text, sizeof(text), "%d %%", percent);
+  if (percent <= 0 || !pct) {
+    lv_obj_t* s = uiNewScreen();
+    uiLabel(s, T("Updating the firmware"), M.fTitle, dx(20), dy(100));
+    pct = uiLabel(s, text, M.fTitle, dx(20), dy(180));
+    uiLabel(s, T("Do not unplug the power"), M.fCaption, dx(20), dy(260));
+    portRefresh(true);
+    return;
+  }
+  lv_label_set_text(pct, text);
+  portRefresh(false);
+}
+
 void uiShowWifiFailed() {
   lv_obj_t* s = uiNewScreen();
   uiLabel(s, T("WiFi setup failed"), M.fTitle, dx(20), dy(20));

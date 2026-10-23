@@ -102,12 +102,17 @@ src/
   font_ui_*.c       generated LVGL fonts for all other text (Montserrat Medium, ASCII + Latin-1)
   font_lcd_*.c      the same for the 480x320 colour profile (smaller sizes)
   http.*            HTTP(S) client (device)
+  ota.*             over-the-air updates: manifest check, verified install, rollback confirmation, nightly schedule
+  version.h         FW_VERSION / BOARD_ID (set at build time), release version compare
 sim/
   sim_main.cpp      SDL2 host: e-paper window, or the colour LCD window with the mouse as touch screen
   http_sim.cpp      HTTP client (libcurl)
+  ota_sim.cpp       stand-in for ota.cpp: a pretend 9.9.9 release, an install that fails
   include/          Arduino, WiFi, WebServer, Preferences... stand-ins
 tools/
   mock_cgm.py       mock CGM services for the simulator
+  version.py        PlatformIO pre-script: bakes FW_VERSION (env var, default dev) and BOARD_ID into the build
+  make_manifest.py  writes manifest.json for a release (version, URL, SHA-256 and size per board)
 ```
 
 ## Development notes
@@ -161,5 +166,22 @@ git tag v1.0.0 && git push --tags
 
 - `<name>-full.bin`: bootloader, partition table and app merged, flashed at `0x0` (first install, erases settings).
 - `<name>-update.bin`: the app alone, flashed at `0x10000` (keeps settings).
+
+The workflow also publishes `manifest.json`, which the devices read (`https://github.com/3djc/GlucoPanel/releases/latest/download/manifest.json`, see `OTA_MANIFEST_URL` in `src/ota.cpp` if you fork the project):
+
+```json
+{"version": "1.2.3", "jc3248w535": {"url": "...", "sha256": "...", "size": 1800512}, "reterminal_e1001": {...}}
+```
+
+The keys are the PlatformIO environment names, which is what `BOARD_ID` is in the firmware. The firmware version is the tag without the `v`; a local build is `dev` unless you set `FW_VERSION=1.2.3` in the environment. Mark a release as a pre-release on GitHub to keep it out of `releases/latest`, so panels do not pick it up (useful for a test tag).
+
+## Over-the-air updates
+
+`src/ota.cpp`. Both boards have two app slots (`app0`, `app1`); an update is written to the idle one and the bootloader switches to it, so the running firmware is never touched while downloading.
+
+- `otaCheck()` fetches the manifest; `otaInstall()` streams the image into the idle slot while hashing it, and only finishes the update if the size and SHA-256 match. The update URL must start with `https://github.com/`.
+- Rollback: the Arduino core's libraries are built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. `ota.cpp` replaces the core's weak `verifyRollbackLater()` (it needs C linkage) so that a new firmware stays "pending" until `otaTick()` confirms it after 60 s of uptime; a restart before that goes back to the old one.
+- Schedule (`autoUpdate()`): the first check 90 s after start, then every 24 h and when the install hour (`update_hour`, local time) begins; one install attempt per night, at most 3 per version (`ota_fv` / `ota_fn` in NVS).
+- Test with two tags: flash a build of `v0.0.1` over USB, publish `v0.0.2`, then use **Check for updates** and **Install now** on the settings page. The two device environments share one PlatformIO framework folder with different versions, so building one after the other can fail until `pio pkg install -e <env>` repairs it (a local issue; CI builds each on its own machine).
 
 The workflow can also be started by hand from the Actions tab to check that the build works without publishing.

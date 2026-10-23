@@ -40,6 +40,9 @@ void uiShowErasePrompt(const String& ssid);
 void uiShowPortal(const String& hotspotPassword);  // hotspot + captive portal: QR codes to join (WPA password) and to open the setup page
 void uiShowConnected(const String& ssid, const String& ip, const String& url, const String& code);
 void uiShowWifiFailed();
+// Firmware update in progress: the first call (and any call with percent <= 0) builds the screen, the next
+// ones only change the percentage.
+void uiShowUpdate(int percent);
 
 // Dashboard modes without a reading (called by display.cpp, which handles the refresh bookkeeping)
 void uiShowNotConfigured(const String& name, const String& url, const String& code);

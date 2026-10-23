@@ -8,11 +8,14 @@
 #include <WiFiManager.h>
 #include "config.h"
 #include "i18n.h"
+#include "ota.h"
+#include "version.h"
 #include "secrets.h"
 #include "wifi_setup.h"  // AP_NAME
 
 static WebServer server(80);
 static bool settingsChanged = false;
+static String installError;  // why the last manual install failed; shown once on the next page load
 
 // ---- access control ----
 // The settings page needs a 6-digit code that only the panel shows (on its screens and in the QR code),
@@ -261,6 +264,40 @@ static void sendLogin(int status, const char* message) {
   server.send(status, "text/html", h);
 }
 
+// The "Firmware updates" block: version, result of the last check, and the buttons.
+static String updateBlock() {
+  static char b[160];
+  String h = String("<hr><h2>") + T("Firmware updates") + "</h2>";
+  snprintf(b, sizeof(b), T("Version: %s"), FW_VERSION);
+  h += String("<p>") + esc(b) + "</p>";
+  const OtaInfo& o = otaLast();
+  if (!o.checked) {
+    h += String("<p>") + T("Not checked yet.") + "</p>";
+  } else if (!o.ok) {
+    snprintf(b, sizeof(b), T("Update check failed: %s"), T(o.error.c_str()));
+    h += String("<p class=err>") + esc(b) + "</p>";
+  } else {
+    if (o.newer) snprintf(b, sizeof(b), T("Update available: %s"), o.version.c_str());
+    else snprintf(b, sizeof(b), "%s", T("Up to date."));
+    h += String("<p class=ok>") + esc(b) + "</p>";
+  }
+  if (o.checked > 1) {
+    char when[24];
+    struct tm t;
+    localtime_r(&o.checked, &t);
+    strftime(when, sizeof(when), "%Y-%m-%d %H:%M", &t);
+    snprintf(b, sizeof(b), T("Last check: %s"), when);
+    h += String("<p class=hint>") + esc(b) + "</p>";
+  }
+  h += String("<form method=post action=/update-check><button>") + T("Check for updates") + "</button></form>";
+  if (o.ok && o.newer) {
+    snprintf(b, sizeof(b), T("Install %s now"), o.version.c_str());
+    h += String("<form method=post action=/update-install onsubmit=\"return confirm('") + jsq(T("Install this update now? The panel restarts.")) +
+         "')\"><button>" + esc(b) + "</button></form>";
+  }
+  return h;
+}
+
 static void handleRoot() {
   if (!authorized()) {
     if (!server.hasArg("k")) return sendLogin(401, "");
@@ -274,6 +311,12 @@ static void handleRoot() {
   String h = pageHead();
   h += String("<style>") + EDITOR_CSS + "</style>";
   if (server.hasArg("saved")) h += String("<p class=ok>") + T("Saved.") + "</p>";
+  if (installError.length()) {
+    char b[200];
+    snprintf(b, sizeof(b), T("Update failed: %s"), T(installError.c_str()));
+    h += String("<p class=err>") + esc(b) + "</p>";
+    installError = "";
+  }
   h += "<form method=post action=/save>";
   for (int i = 0; i < CONFIG_FIELD_COUNT; i++) {
     const ConfigField& f = CONFIG_FIELDS[i];
@@ -304,6 +347,7 @@ static void handleRoot() {
   char refresh[160];
   snprintf(refresh, sizeof(refresh), T("Refresh: every %d min (set by the data source)."), refreshMinutes());
   h += String("<p>") + refresh + "</p>";
+  h += updateBlock();
   h += String("<hr><form method=post action=/reset-wifi onsubmit=\"return confirm('") + jsq(T("Erase saved WiFi and reboot into setup mode?")) + "')\">" +
        "<button class=danger>" + T("Erase WiFi and reboot into setup") + "</button></form>"
        "<script>const s=document.getElementById('source');"
@@ -386,6 +430,27 @@ static void handleSave() {
   server.send(303, "text/plain", "");
 }
 
+static void handleUpdateCheck() {
+  if (!authorized()) return server.send(403, "text/plain", "Forbidden");
+  otaCheck();
+  server.sendHeader("Location", "/");
+  server.send(303, "text/plain", "");
+}
+
+static void handleUpdateInstall() {
+  if (!authorized()) return server.send(403, "text/plain", "Forbidden");
+  OtaInfo o = otaCheck();  // a fresh look: the release may have changed since the last check
+  if (!o.ok || !o.newer) {
+    server.sendHeader("Location", "/");
+    return server.send(303, "text/plain", "");
+  }
+  server.send(200, "text/html", pageHead() + "<p class=ok>" + T("Updating. The panel restarts in about a minute; reload this page then.") +
+                                  "</p></body></html>");
+  server.client().stop();  // the browser has its answer; the install below blocks for 20-40 s
+  String error;
+  if (!otaInstall(o, error)) installError = error;  // only returns when it failed
+}
+
 static void handleResetWifi() {
   if (!authorized()) return server.send(403, "text/plain", "Forbidden");
   char msg[200];
@@ -404,6 +469,8 @@ void configServerBegin() {
   server.collectHeaders(headerKeys, 1);
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/update-check", HTTP_POST, handleUpdateCheck);
+  server.on("/update-install", HTTP_POST, handleUpdateInstall);
   server.on("/reset-wifi", HTTP_POST, handleResetWifi);
   server.begin();
 }

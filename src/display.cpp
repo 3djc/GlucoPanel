@@ -173,6 +173,14 @@ void dashboardShowConfig(const String& url, const String& code) {
   uiShowConfigQr(url, code);
 }
 
+void dashboardShowUpdate(int percent) {
+  if (!overlay) {
+    overlay = true;
+    portSetInvert(false);
+  }
+  uiShowUpdate(percent);
+}
+
 void dashboardHideConfig() {
   if (!overlay) return;
   overlay = false;
