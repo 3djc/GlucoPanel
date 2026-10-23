@@ -65,7 +65,7 @@ String cfgGet(const char* key) {
     if (!strcmp(CONFIG_FIELDS[i].key, key)) def = CONFIG_FIELDS[i].def;
   Preferences prefs;
   prefs.begin(NS, false);
-  String v = prefs.getString(key, def);
+  String v = prefs.isKey(key) ? prefs.getString(key, def) : def;  // getString() logs an error for a key that was never saved
   prefs.end();
   return v;
 }

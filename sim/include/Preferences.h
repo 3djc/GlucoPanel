@@ -12,6 +12,7 @@ class Preferences {
     auto it = db().find(ns_ + "/" + k);
     return it == db().end() ? def : String(it->second);
   }
+  bool isKey(const char* k) { return db().count(ns_ + "/" + k) > 0; }
   size_t putString(const char* k, const String& v) {
     db()[ns_ + "/" + k] = v;
     save();

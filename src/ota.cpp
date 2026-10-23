@@ -91,6 +91,8 @@ static OtaInfo fetchManifest() {
 OtaInfo otaCheck() {
   lastCheck = fetchManifest();
   lastCheck.checked = time(nullptr) > 1700000000 ? time(nullptr) : 1;  // 1: checked, the clock was not set
+  Serial.printf("update check: %s\n", lastCheck.ok ? (lastCheck.newer ? ("new version " + lastCheck.version).c_str() : "up to date")
+                                                    : lastCheck.error.c_str());
   return lastCheck;
 }
 
@@ -101,7 +103,7 @@ static bool fail(String& error, const String& why) {
   return false;
 }
 
-bool otaInstall(const OtaInfo& info, String& error) {
+static bool install(const OtaInfo& info, String& error) {
   HTTPClient http;
   WiFiClientSecure tls;
   if (!beginHttps(http, tls, info.url)) { error = "bad URL"; return false; }
@@ -173,6 +175,13 @@ bool otaInstall(const OtaInfo& info, String& error) {
   return true;  // not reached
 }
 
+bool otaInstall(const OtaInfo& info, String& error) {
+  Serial.printf("installing %s\n", info.version.c_str());
+  bool ok = install(info, error);  // only returns on failure
+  if (!ok) Serial.printf("update failed: %s\n", error.c_str());
+  return ok;
+}
+
 // ---- automatic updates ----
 
 static const unsigned long CHECK_EVERY_MS = 24UL * 3600UL * 1000UL;
@@ -219,23 +228,18 @@ static void autoUpdate(bool canInstall) {
     holdUntil = ms + RETRY_MS;
     nextCheck = ms + (o.ok ? CHECK_EVERY_MS : RETRY_MS);
     if (o.ok && inWindow) checkedDay = today;
-    Serial.printf("update check: %s\n", o.ok ? (o.newer ? ("new version " + o.version).c_str() : "up to date") : o.error.c_str());
   }
 
   const OtaInfo& o = otaLast();
   if (!inWindow || !canInstall || !o.ok || !o.newer || checkedDay != today || triedDay == today || givenUp(o.version)) return;
   triedDay = today;  // one attempt per night
-  Serial.printf("installing %s\n", o.version.c_str());
   String error;
-  if (!otaInstall(o, error)) {  // only returns on failure
-    noteFailure(o.version);
-    Serial.printf("update failed: %s\n", error.c_str());
-  }
+  if (!otaInstall(o, error)) noteFailure(o.version);  // only returns on failure
 }
 
 void otaTick(bool canInstall) {
   static unsigned long lastRun = 0;
-  if (millis() - lastRun < 1000) return;  // the settings are read from flash: once a second is plenty
+  if (millis() - lastRun < 1000) return;  // once a second is plenty for the confirmation timer
   lastRun = millis();
 
   static bool confirmed = false;
@@ -244,6 +248,9 @@ void otaTick(bool canInstall) {
     // A no-op unless this run is a freshly installed update still waiting to be confirmed.
     if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) Serial.println("firmware confirmed");
   }
+  static unsigned long lastAuto = 0;
+  if (lastAuto && millis() - lastAuto < 10000) return;  // reads the settings: every 10 s is plenty
+  lastAuto = millis();
   autoUpdate(canInstall);
 }
 #endif
