@@ -104,7 +104,12 @@ void portRefresh(bool forceFull) {
 #define LIGHT_GREY_DOTS 2
 #endif
 
-#define BLACK_BELOW 128  // luminance (0..255) under which a pixel is drawn black
+// Luminance (0..255) under which a pixel is drawn black. The fonts are anti-aliased: with 128 the thin strokes of
+// the small texts came out one pixel wide and pale on the panel. A higher value keeps the grey edge pixels, which
+// gives strokes two pixels wide; much above ~220 the small letters start to fill up.
+#ifndef BLACK_BELOW
+#define BLACK_BELOW 192
+#endif
 
 #ifdef ARDUINO
 // Seeed_GFX's updataPartial() only sends the NEW image of the window to the UC8179. The controller drives the pixels
