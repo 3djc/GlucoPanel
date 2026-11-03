@@ -15,6 +15,7 @@ LV_FONT_DECLARE(font_ui_48);
 LV_FONT_DECLARE(font_ui_72);
 
 // Big digits for the glucose value (Montserrat Medium, digits and . - + only).
+LV_FONT_DECLARE(font_big_144);
 LV_FONT_DECLARE(font_big_128);
 LV_FONT_DECLARE(font_big_96);
 

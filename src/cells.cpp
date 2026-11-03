@@ -193,7 +193,7 @@ void buildCaptioned(Cell& c, const char* caption, bool withSubLine = false) {
 }
 
 void buildValue(Cell& c) {
-  c.a = label(c, c.h >= M.tallH ? M.fBigL : M.fBigM);
+  c.a = label(c, c.h >= M.tallH ? M.fBigXL : M.fBigM);
   c.b = label(c, M.fMid);
   layoutValue(c);
 }
@@ -245,10 +245,10 @@ void updateValue(Cell& c, const CellView& v) {
   if (v.mmol) snprintf(buf, sizeof(buf), "%.1f", v.last.mgdl / 18.016);
   else snprintf(buf, sizeof(buf), "%d", v.last.mgdl);
   // biggest font that still fits the block
-  const lv_font_t* candidates[] = {M.fBigL, M.fBigM, M.fNum};
+  const lv_font_t* candidates[] = {M.fBigXL, M.fBigL, M.fBigM, M.fNum};
   bool tall = c.h >= M.tallH;
-  const lv_font_t* f = candidates[tall ? 0 : 1];
-  for (int i = tall ? 0 : 1; i < 3; i++) {
+  const lv_font_t* f = candidates[tall ? 0 : 2];
+  for (int i = tall ? 0 : 2; i < 4; i++) {
     f = candidates[i];
     lv_point_t size;
     lv_text_get_size(&size, buf, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);

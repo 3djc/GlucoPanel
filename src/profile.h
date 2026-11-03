@@ -23,6 +23,7 @@ struct Metrics {
   // fonts
   const lv_font_t *fSmall, *fCaption, *fMid, *fTitle, *fNum, *fBigL, *fBigM;
   const lv_font_t* fNumBig;  // the numbers of the blocks when they fit; fNum otherwise (same as fNum on the LCD)
+  const lv_font_t* fBigXL;   // the glucose value in a tall block when it fits; fBigL otherwise (same as fBigL on the LCD)
   int qr;  // size of the QR codes on the WiFi and settings screens
 };
 
