@@ -200,6 +200,10 @@ static void noteFailure(const String& version) {
   cfgSet("ota_fn", String(n + 1));
 }
 
+static unsigned long nextCheck = FIRST_CHECK_MS, holdUntil = 0;
+static int checkedDay = -1, triedDay = -1;
+static bool primed = false;  // the timers start when automatic updates are first seen on (millis() compares only work within ~24 days)
+
 // Looks for a new release once a day and, if there is one, installs it during the hour chosen in the
 // settings. `canInstall` is false while the panel is busy or in trouble (settings screen open, fetch error).
 static void autoUpdate(bool canInstall) {
@@ -211,10 +215,7 @@ static void autoUpdate(bool canInstall) {
   bool inWindow = t.tm_hour == cfgGet("update_hour").toInt();
   int today = t.tm_year * 366 + t.tm_yday;
 
-  static unsigned long nextCheck = FIRST_CHECK_MS, holdUntil = 0;
-  static int checkedDay = -1, triedDay = -1;
   unsigned long ms = millis();
-  static bool primed = false;  // the timers start when automatic updates are first seen on (millis() compares only work within ~24 days)
   if (!primed) {
     primed = true;
     nextCheck = ms < FIRST_CHECK_MS ? FIRST_CHECK_MS : ms;
@@ -234,6 +235,22 @@ static void autoUpdate(bool canInstall) {
   triedDay = today;  // one attempt per night
   String error;
   if (!otaInstall(o, error)) noteFailure(o.version);  // only returns on failure
+}
+
+bool otaWantsNetwork() {
+  if (cfgGet("auto_update") != "on") return false;
+  time_t now = time(nullptr);
+  if (now < 1700000000) return false;  // no clock yet: nothing to check against
+  struct tm t;
+  localtime_r(&now, &t);
+  bool inWindow = t.tm_hour == cfgGet("update_hour").toInt();
+  int today = t.tm_year * 366 + t.tm_yday;
+  unsigned long ms = millis();
+  if (!primed) return true;  // let autoUpdate() start its timers
+  if (reached(ms, nextCheck) && reached(ms, holdUntil)) return true;           // the daily check is due
+  if (inWindow && checkedDay != today && reached(ms, holdUntil)) return true;  // the check of the update hour
+  const OtaInfo& o = otaLast();
+  return inWindow && checkedDay == today && triedDay != today && o.ok && o.newer && !givenUp(o.version);  // an install waits
 }
 
 void otaTick(bool canInstall) {

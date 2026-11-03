@@ -29,3 +29,9 @@ bool otaInstall(const OtaInfo& info, String& error);
 // "Install updates automatically" is on, checks for a new release daily and installs it in the chosen hour.
 // canInstall: false while the panel should not be interrupted (settings screen open, a fetch error showing).
 void otaTick(bool canInstall);
+
+#ifdef ARDUINO
+// True when otaTick() is about to need the network (a check is due, or an install is waiting for its hour):
+// the panel then keeps the WiFi on instead of sleeping.
+bool otaWantsNetwork();
+#endif

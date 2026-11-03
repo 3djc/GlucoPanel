@@ -81,6 +81,18 @@ bool wifiConnect() {
   return ok;
 }
 
+#ifdef ARDUINO
+void wifiSuspend() { WiFi.mode(WIFI_OFF); }
+
+bool wifiResume(unsigned long timeoutMs) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin();  // the credentials saved by the setup portal
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) delay(50);
+  return WiFi.status() == WL_CONNECTED;
+}
+#endif
+
 void wifiEraseAndRestart() {
   uiShowWifiErased();
   delay(500);

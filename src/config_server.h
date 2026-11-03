@@ -4,6 +4,10 @@
 // Starts the settings web page (http://<ip>/ and http://glucopanel.local/). Call once WiFi is up.
 void configServerBegin();
 void configServerHandle();  // call from loop()
+#ifdef ARDUINO
+void configServerSuspend();  // light sleep: call BEFORE the WiFi is switched off (mDNS must be stopped while its interface exists)
+void configServerResume();   // ... and this one after the WiFi is back
+#endif
 bool configServerTakeChanged();  // true once after settings were saved (then resets)
 
 // The code that opens the settings page (see config_server.cpp). It is shown on the panel's screens and

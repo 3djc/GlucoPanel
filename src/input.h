@@ -18,3 +18,8 @@ struct Input {
 
 void inputBegin();  // button pins / touch controller
 Input inputPoll();  // call every loop
+
+#if defined(ARDUINO) && !defined(UI_PROFILE_LCD)
+bool inputIdle();     // no button is down (nor being timed): safe to go to sleep
+void inputArmWake();  // let a button press wake the chip from light sleep
+#endif

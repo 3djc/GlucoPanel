@@ -477,6 +477,20 @@ void configServerBegin() {
 
 void configServerHandle() { server.handleClient(); }
 
+#ifdef ARDUINO
+// WiFi.mode(WIFI_OFF) destroys the network interface; stopping mDNS afterwards dereferences it and crashes.
+void configServerSuspend() {
+  server.stop();
+  MDNS.end();
+}
+
+void configServerResume() {
+  MDNS.begin("glucopanel");
+  MDNS.addService("http", "tcp", 80);
+  server.begin();
+}
+#endif
+
 bool configServerTakeChanged() {
   bool c = settingsChanged;
   settingsChanged = false;

@@ -1,6 +1,10 @@
 #include "input.h"
 #include <Arduino.h>
 #include "touch.h"
+#ifdef ARDUINO
+#include <driver/gpio.h>
+#include <esp_sleep.h>
+#endif
 
 #ifdef UI_PROFILE_LCD
 // ---------------------------------------------------------------------------------------------------
@@ -92,4 +96,14 @@ Input inputPoll() {
   in.heldMs = green.down ? millis() - green.since : 0;
   return in;
 }
+
+#ifdef ARDUINO
+bool inputIdle() { return !green.down && !other.down && digitalRead(BTN_GREEN) == HIGH && digitalRead(BTN_OTHER) == HIGH; }
+
+void inputArmWake() {
+  gpio_wakeup_enable((gpio_num_t)BTN_GREEN, GPIO_INTR_LOW_LEVEL);  // buttons are active low
+  gpio_wakeup_enable((gpio_num_t)BTN_OTHER, GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
+}
+#endif
 #endif
