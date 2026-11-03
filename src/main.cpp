@@ -137,7 +137,7 @@ static void refresh() {
 
 #if POWER_SAVE
 static const unsigned long AWAKE_AFTER_BOOT_MS = 120000;  // the first fetches, the first update check, the firmware confirmation
-static const long MIN_SLEEP_MS = 30000;                   // a shorter wait is not worth switching the radio off for
+static const long MIN_SLEEP_MS = 30000;                   // a shorter wait is not worth switching the radio off for (it is worth it when the radio is already off)
 
 // Between two events the chip light-sleeps with the radio off. It wakes at the next clock minute (the clock, the
 // age and the freshness bar move then), at the next fetch, or when a button is pressed.
@@ -145,11 +145,12 @@ static void powerTick() {
   if (!online || configShown || millis() < AWAKE_AFTER_BOOT_MS) return;
   if (otaWantsNetwork() || !inputIdle()) return;
   long toFetch = (long)(nextFetch - millis());
-  if (toFetch < MIN_SLEEP_MS) return;  // retrying soon (Dexcom waits 10 s for a new reading): stay connected
+  if (toFetch < MIN_SLEEP_MS && radioOn) return;  // retrying soon (Dexcom waits 10 s for a new reading): stay connected
+  if (toFetch < 1000) return;                      // the fetch is about to start
   time_t now = time(nullptr);
   long toMinute = now > 1700000000 ? (60 - (long)(now % 60)) * 1000L + 300 : 60000L;
   long sleepMs = std::min(toFetch, toMinute);
-  if (sleepMs < 1000) sleepMs += 60000;  // just before a minute change: skip to the next one
+  if (sleepMs < 1000) sleepMs = std::min(sleepMs + 60000, toFetch);  // just before a minute change: skip to the next one
 
   if (radioOn) configServerSuspend();  // before the WiFi goes off (see config_server.cpp)
   wifiSuspend();
