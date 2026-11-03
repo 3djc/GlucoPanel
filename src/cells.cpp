@@ -23,6 +23,25 @@ lv_obj_t* label(const Cell& c, const lv_font_t* font, int top) { return uiLabel(
 
 // ---------- text helpers ----------
 
+// Top of a block's number label for a font: the number keeps the same centre whatever its size.
+int numberTop(const Cell& c, const lv_font_t* f) {
+  return centreY(c) + M.numDy + lineHeight(M.fNum) / 2 - lineHeight(f) / 2;
+}
+
+// A block's number: the big font when the text fits the block, the regular one otherwise (a wide text such as
+// "62 - 241"). `allowBig` is false for blocks with a small line under the number: there is no room for it.
+void setNumber(Cell& c, const char* text, bool allowBig = true) {
+  const lv_font_t* f = M.fNumBig;
+  lv_point_t size;
+  lv_text_get_size(&size, text, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  if (!allowBig || size.x > c.w - 16) f = M.fNum;
+  if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) {
+    lv_obj_set_style_text_font(c.a, f, 0);
+    lv_obj_set_y(c.a, numberTop(c, f));
+  }
+  setText(c.a, text);
+}
+
 // "+12" / "-3" / "0" ("+0.6" in mmol/L), "--" while the history is too short.
 String deltaText(bool has, int delta, bool mmol) {
   if (!has) return "--";
@@ -132,8 +151,8 @@ void buildArrow(Cell& c) {
 
 void buildClock(Cell& c) {
   // Measured: the date + time ink is centred 13 px above the time label's centre.
-  int timeTop = centreY(c) + M.clockDy - lineHeight(M.fNum) / 2;
-  c.a = label(c, M.fNum, timeTop);
+  int timeTop = centreY(c) + M.clockDy - lineHeight(M.fNumBig) / 2;
+  c.a = label(c, M.fNumBig, timeTop);
   c.b = label(c, M.fMid, timeTop - lineHeight(M.fMid) + M.dateGap);
 }
 
@@ -201,7 +220,7 @@ void updateReadTime(Cell& c, const CellView& v) {
   localtime_r(&v.last.when, &t);
   char buf[8];
   strftime(buf, sizeof(buf), "%H:%M", &t);
-  setText(c.a, buf);
+  setNumber(c, buf);
 }
 
 void updateAge(Cell& c, const CellView& v) {
@@ -209,7 +228,7 @@ void updateAge(Cell& c, const CellView& v) {
   char buf[16];
   if (m < 60) snprintf(buf, sizeof(buf), T("%d min"), m);
   else snprintf(buf, sizeof(buf), "%dh%02d", m / 60, m % 60);
-  setText(c.a, buf);
+  setNumber(c, buf);
 }
 
 void updateFresh(Cell& c, const CellView& v) {
@@ -253,7 +272,7 @@ void updateStat(Cell& c, const CellView& v) {
     }
   }
   setText(c.b, caption.c_str());
-  setText(c.a, number.c_str());
+  setNumber(c, number.c_str(), sub.length() == 0);
   setText(c.c, sub.c_str());
 }
 
@@ -328,9 +347,9 @@ void cellUpdate(Cell& c, const CellView& v) {
   switch (c.type) {
     case CELL_VALUE: updateValue(c, v); break;
     case CELL_ARROW: updateArrow(c, v); break;
-    case CELL_DELTA1: setText(c.a, deltaText(v.deltas.has1, v.deltas.d1, v.mmol).c_str()); break;
-    case CELL_DELTA15: setText(c.a, deltaText(v.deltas.has15, v.deltas.d15, v.mmol).c_str()); break;
-    case CELL_DELTA30: setText(c.a, deltaText(v.deltas.has30, v.deltas.d30, v.mmol).c_str()); break;
+    case CELL_DELTA1: setNumber(c, deltaText(v.deltas.has1, v.deltas.d1, v.mmol).c_str()); break;
+    case CELL_DELTA15: setNumber(c, deltaText(v.deltas.has15, v.deltas.d15, v.mmol).c_str()); break;
+    case CELL_DELTA30: setNumber(c, deltaText(v.deltas.has30, v.deltas.d30, v.mmol).c_str()); break;
     case CELL_CLOCK: updateClock(c); break;
     case CELL_READTIME: updateReadTime(c, v); break;
     case CELL_AGE: updateAge(c, v); break;

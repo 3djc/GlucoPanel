@@ -26,6 +26,7 @@ struct Metrics {
   int gLine, gDot, gDotBig, gTick, gLabelH, gTickLabelHalfW, gTickLabelDy, gDash;
   // fonts
   const lv_font_t *fSmall, *fCaption, *fMid, *fTitle, *fNum, *fBigL, *fBigM;
+  const lv_font_t* fNumBig;  // the numbers of the blocks when they fit; fNum otherwise (same as fNum on the LCD)
   int qr;  // size of the QR codes on the WiFi and settings screens
 };
 
