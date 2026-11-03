@@ -194,6 +194,15 @@ void dashboardTick() {
   if (millis() - lastCheck < 1000) return;
   lastCheck = millis();
 
+#ifndef UI_PROFILE_LCD
+  // E-paper: every redraw is a visible flash, so the clock, the reading age and the freshness bar all move together,
+  // once per clock minute (a reading's own minutes would tick at a different second and add redraws).
+  static long lastMinute = -1;
+  long minute = (long)(time(nullptr) / 60);
+  if (minute == lastMinute) return;
+  lastMinute = minute;
+#endif
+
   updateCells();  // clock, reading age and freshness bar move with time
   portRefresh(false);
 }
