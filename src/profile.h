@@ -12,6 +12,7 @@ struct Metrics {
   int bandX, bandY, bandW, bandH, bandRadius, bandSepInset;
   int midY, midH;
   int graphY, graphH;
+  int centerW;  // width of the middle column of the top and middle rows; the sides share the rest (0: three equal columns)
   int stripY, edge;  // error text (over the bottom of the graph on the e-paper), and its left margin
   // blocks: their content is centred in the block from the fonts' real glyph sizes (see cells.cpp)
   int tallH;         // a block at least this tall gets the big value font and the taller freshness bar

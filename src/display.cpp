@@ -38,6 +38,13 @@ struct LastArgs {
 } lastArgs;
 bool overlay = false;  // the settings screen is up
 
+// Left edge of column i (0..3) in a row `w` wide: three columns, the middle one M.centerW wide when that is set.
+int colX(int w, int i) {
+  if (!M.centerW) return i * w / 3;
+  int side = (w - M.centerW) / 2;
+  return i == 0 ? 0 : i == 1 ? side : i == 2 ? side + M.centerW : w;
+}
+
 // Everything that needs the screen to be rebuilt when it changes.
 String layoutSignature() {
   String sig = cfgGet("tz") + "|" + cfgGet("lang");
@@ -81,7 +88,7 @@ void buildReadingScreen() {
 
   for (int i = 1; i < 3; i++) {  // separators
     lv_obj_t* sep = lv_obj_create(band);
-    lv_obj_set_pos(sep, i * M.bandW / 3, M.bandSepInset);
+    lv_obj_set_pos(sep, colX(M.bandW, i), M.bandSepInset);
     lv_obj_set_size(sep, 1, M.bandH - 2 * M.bandSepInset);
     lv_obj_set_style_bg_color(sep, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(sep, LV_OPA_COVER, 0);
@@ -95,14 +102,14 @@ void buildReadingScreen() {
     c.type = cellTypeFromString(cfgGet(CELL_KEYS[i]));
     if (i < 3) {  // top row: inside the band
       c.parent = band;
-      c.x = i * M.bandW / 3;
+      c.x = colX(M.bandW, i);
       c.y = 0;
-      c.w = (i + 1) * M.bandW / 3 - c.x;
+      c.w = colX(M.bandW, i + 1) - c.x;
       c.h = M.bandH;
     } else if (i < 6) {  // middle row
       c.parent = scr;
-      c.x = (i - 3) * SCREEN_W / 3;
-      c.w = (i - 2) * SCREEN_W / 3 - c.x;
+      c.x = colX(SCREEN_W, i - 3);
+      c.w = colX(SCREEN_W, i - 2) - c.x;
       c.y = M.midY;
       c.h = M.midH;
     } else {  // bottom row

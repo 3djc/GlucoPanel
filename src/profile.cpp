@@ -17,6 +17,7 @@ const Metrics M = {
     4, 6, 472, 87, 7, 9,     // band
     96, 107,                  // middle row
     215, 90,                  // graph
+    0,                        // middle column: a third
     306, 6,                   // error strip
     100,                      // tallH
     80, 60,                   // arrow box, length
@@ -36,6 +37,7 @@ const Metrics M = {
     0, 0, 800, 140, 0, 14,    // band: the top row
     140, 200,                 // middle row
     340, 140,                 // graph: the rest of the screen
+    320,                      // middle column (the glucose value); the sides are 240 each
     458, 10,                  // error strip (drawn over the bottom of the graph)
     150,                      // tallH
     130, 112,                 // arrow box, length
