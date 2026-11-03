@@ -7,20 +7,16 @@
 // numbers. The e-paper values were measured on the rendered screen; the LCD ones are tuned in the simulator.
 struct Metrics {
   int screenW, screenH;
-  // dashboard rows
+  // dashboard rows: the top row (the band), the middle row and the graph. On the e-paper they tile the screen
+  // exactly: the bottom of one row is the top of the next.
   int bandX, bandY, bandW, bandH, bandRadius, bandSepInset;
   int midY, midH;
   int graphY, graphH;
-  int stripY, edge;  // error text under the graph, and its left margin
-  // blocks
-  int tallH;         // a block at least this tall gets the big value font and the roomier value layout
-  int valueShift;    // small content in the middle row is centred this far below the row centre (on the value + unit ink)
-  int capDy, numDy, subDy;  // caption, number and small line relative to the content centre
-  int digitsTall, unitTall, digitsShort, unitShort;  // value digits / unit centre relative to the block centre
+  int stripY, edge;  // error text (over the bottom of the graph on the e-paper), and its left margin
+  // blocks: their content is centred in the block from the fonts' real glyph sizes (see cells.cpp)
+  int tallH;         // a block at least this tall gets the big value font and the taller freshness bar
   int arrowBox, arrowLen;
-  int clockDy, dateGap;
   int barTall, barShort, segW, segGap, segBorder, segRadius;  // freshness bar
-  int hbaNum, hbaNoData;  // HbA1c number / "not available" text, above the content centre
   // graph
   int gLeft, gRight, gTop, gBottom;  // margins inside the widget (y labels left, hour labels bottom)
   int gLine, gDot, gDotBig, gTick, gLabelH, gTickLabelHalfW, gTickLabelDy, gDash;

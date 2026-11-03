@@ -14,8 +14,7 @@ const int SCREEN_W = M.screenW;
 
 enum Mode { MODE_NONE, MODE_NOT_CONFIGURED, MODE_NO_DATA, MODE_READING };
 
-// Top band (like Gluco-Monitor's): rounded, light grey, three cells. All sizes come from the profile (profile.cpp).
-const int BAND_CELL_W = M.bandW / 3;
+// Top band (like Gluco-Monitor's): three cells, on a light grey card on the LCD. All sizes come from the profile (profile.cpp).
 
 // The blocks, in the order of their settings: top row, middle row, bottom row.
 const int N_CELLS = 7;
@@ -48,7 +47,10 @@ String layoutSignature() {
 
 void setError(const String& error) {
   String text = error.length() ? "! " + error : String();
-  if (text != lv_label_get_text(errorLabel)) lv_label_set_text(errorLabel, text.c_str());  // keep refreshes small
+  if (text == lv_label_get_text(errorLabel)) return;  // keep refreshes small
+  lv_label_set_text(errorLabel, text.c_str());
+  // The text sits over the bottom of the graph on the e-paper: a white background keeps it readable.
+  lv_obj_set_style_bg_opa(errorLabel, text.length() ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
 }
 
 bool night = false;
@@ -79,7 +81,7 @@ void buildReadingScreen() {
 
   for (int i = 1; i < 3; i++) {  // separators
     lv_obj_t* sep = lv_obj_create(band);
-    lv_obj_set_pos(sep, i * BAND_CELL_W, M.bandSepInset);
+    lv_obj_set_pos(sep, i * M.bandW / 3, M.bandSepInset);
     lv_obj_set_size(sep, 1, M.bandH - 2 * M.bandSepInset);
     lv_obj_set_style_bg_color(sep, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(sep, LV_OPA_COVER, 0);
@@ -93,9 +95,9 @@ void buildReadingScreen() {
     c.type = cellTypeFromString(cfgGet(CELL_KEYS[i]));
     if (i < 3) {  // top row: inside the band
       c.parent = band;
-      c.x = i * BAND_CELL_W;
+      c.x = i * M.bandW / 3;
       c.y = 0;
-      c.w = BAND_CELL_W;
+      c.w = (i + 1) * M.bandW / 3 - c.x;
       c.h = M.bandH;
     } else if (i < 6) {  // middle row
       c.parent = scr;
@@ -103,7 +105,6 @@ void buildReadingScreen() {
       c.w = (i - 2) * SCREEN_W / 3 - c.x;
       c.y = M.midY;
       c.h = M.midH;
-      c.middleRow = true;
     } else {  // bottom row
       c.parent = scr;
       c.x = 0;
@@ -114,9 +115,11 @@ void buildReadingScreen() {
     cellBuild(c);
   }
 
-  errorLabel = uiLabel(scr, "", M.fCaption, M.edge, M.stripY);
+  errorLabel = uiLabel(scr, "", M.fCaption, M.edge, M.stripY);  // as wide as its text, up to the screen width
   lv_label_set_long_mode(errorLabel, LV_LABEL_LONG_CLIP);
-  lv_obj_set_width(errorLabel, SCREEN_W - 2 * M.edge);
+  lv_obj_set_style_max_width(errorLabel, SCREEN_W - 2 * M.edge, 0);
+  lv_obj_set_style_bg_color(errorLabel, lv_color_white(), 0);
+  lv_obj_set_style_bg_opa(errorLabel, LV_OPA_TRANSP, 0);
 }
 
 }  // namespace

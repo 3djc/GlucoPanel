@@ -40,7 +40,6 @@ struct Cell {
   CellType type = CELL_NONE;
   lv_obj_t* parent = nullptr;
   int x = 0, y = 0, w = 0, h = 0;  // position in `parent`
-  bool middleRow = false;          // small content is centred on the value block there, not on the cell
   // widgets and state, owned by cells.cpp
   lv_obj_t *a = nullptr, *b = nullptr, *c = nullptr;
   lv_obj_t* seg[5] = {};

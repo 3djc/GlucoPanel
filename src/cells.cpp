@@ -1,5 +1,6 @@
 #include "cells.h"
 #include <math.h>
+#include <algorithm>
 #include <string.h>
 #include "graph.h"
 #include "i18n.h"
@@ -16,17 +17,86 @@ void setText(lv_obj_t* label, const char* text) {
 
 int lineHeight(const lv_font_t* f) { return lv_font_get_line_height(f); }
 
-// Vertical centre of the block's small content.
-int centreY(const Cell& c) { return c.y + c.h / 2 + (c.middleRow ? M.valueShift : 0); }
+// A centred label across the whole block; its vertical position is set by the layout functions below.
+lv_obj_t* label(const Cell& c, const lv_font_t* font) { return uiLabel(c.parent, "", font, c.x, c.y, c.w); }
 
-lv_obj_t* label(const Cell& c, const lv_font_t* font, int top) { return uiLabel(c.parent, "", font, c.x, top, c.w); }
+const lv_font_t* fontOf(lv_obj_t* l) { return lv_obj_get_style_text_font(l, LV_PART_MAIN); }
+
+// ---------- vertical centring ----------
+// Every block centres its content in its own rectangle, horizontally (the labels are as wide as the block and
+// centred) and vertically (from the real size of the glyphs, not of the lines: a line has empty space above and
+// below its ink).
+
+struct Ink {
+  int top, bottom;  // first and last row of ink, from the top of the label
+};
+
+// Ink extent of the glyphs of `ref` in a font. The reference text is fixed per kind of line (digits, a caption with
+// a descender...) so the layout does not move when the text changes.
+Ink inkOf(const lv_font_t* f, const char* ref) {
+  int baseline = lineHeight(f) - f->base_line;  // y of the baseline inside the label
+  Ink k = {1000, -1000};
+  for (const char* p = ref; *p; p++) {
+    lv_font_glyph_dsc_t g;
+    if (!lv_font_get_glyph_dsc(f, &g, (uint8_t)*p, 0)) continue;
+    k.top = std::min(k.top, baseline - (g.ofs_y + g.box_h));
+    k.bottom = std::max(k.bottom, baseline - g.ofs_y);
+  }
+  return k;
+}
+
+struct Line {
+  lv_obj_t* obj;
+  Ink ink;
+};
+
+// Stacks the lines with `gap` px between their ink and centres the stack vertically in the block.
+void centreStack(const Cell& c, const Line* lines, int n, int gap) {
+  int total = (n - 1) * gap;
+  for (int i = 0; i < n; i++) total += lines[i].ink.bottom - lines[i].ink.top;
+  int y = c.y + (c.h - total) / 2;
+  for (int i = 0; i < n; i++) {
+    int top = y - lines[i].ink.top;
+    if (lv_obj_get_style_y(lines[i].obj, LV_PART_MAIN) != top) lv_obj_set_y(lines[i].obj, top);  // no redraw if unchanged
+    y += lines[i].ink.bottom - lines[i].ink.top + gap;
+  }
+}
+
+int gapOf() { return lineHeight(M.fCaption) / 3; }
+
+// The number of a block: a digit's ink; the HbA1c text may wrap on several lines.
+Ink numberInk(const Cell& c) {
+  const lv_font_t* f = fontOf(c.a);
+  Ink k = inkOf(f, "0");
+  if (c.type == CELL_HBA1C) {
+    lv_point_t size;
+    lv_text_get_size(&size, lv_label_get_text(c.a), f, 0, 0, c.w, LV_TEXT_FLAG_NONE);
+    k.bottom += (std::max(1, (int)(size.y / lineHeight(f))) - 1) * lineHeight(f);
+  }
+  return k;
+}
+
+// Caption, number and (when there is one) a small line under the number.
+void layoutCaptioned(Cell& c) {
+  Line lines[3] = {{c.b, inkOf(fontOf(c.b), "Hg")}, {c.a, numberInk(c)}, {nullptr, {0, 0}}};
+  int n = 2;
+  if (c.c) lines[n++] = {c.c, inkOf(fontOf(c.c), "Hg")};
+  centreStack(c, lines, n, gapOf());
+}
+
+// The glucose value and its unit.
+void layoutValue(Cell& c) {
+  Line lines[2] = {{c.a, inkOf(fontOf(c.a), "0")}, {c.b, inkOf(M.fMid, "mg/dL")}};
+  centreStack(c, lines, 2, lineHeight(M.fMid) / 2);
+}
+
+// The date over the time.
+void layoutClock(Cell& c) {
+  Line lines[2] = {{c.b, inkOf(M.fMid, "Hg")}, {c.a, inkOf(M.fNumBig, "0")}};
+  centreStack(c, lines, 2, gapOf());
+}
 
 // ---------- text helpers ----------
-
-// Top of a block's number label for a font: the number keeps the same centre whatever its size.
-int numberTop(const Cell& c, const lv_font_t* f) {
-  return centreY(c) + M.numDy + lineHeight(M.fNum) / 2 - lineHeight(f) / 2;
-}
 
 // A block's number: the big font when the text fits the block, the regular one otherwise (a wide text such as
 // "62 - 241"). `allowBig` is false for blocks with a small line under the number: there is no room for it.
@@ -35,9 +105,9 @@ void setNumber(Cell& c, const char* text, bool allowBig = true) {
   lv_point_t size;
   lv_text_get_size(&size, text, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   if (!allowBig || size.x > c.w - 16) f = M.fNum;
-  if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) {
+  if (fontOf(c.a) != f) {
     lv_obj_set_style_text_font(c.a, f, 0);
-    lv_obj_set_y(c.a, numberTop(c, f));
+    layoutCaptioned(c);
   }
   setText(c.a, text);
 }
@@ -112,55 +182,49 @@ void arrowDrawCb(lv_event_t* ev) {
 
 // ---------- block builders ----------
 
-// A caption over a big number (the delta, reading time and age blocks).
-void buildCaptioned(Cell& c, const char* caption) {
-  int cy = centreY(c);
-  c.b = label(c, M.fCaption, cy + M.capDy);
+// A caption over a big number (the delta, reading time and age blocks), plus a small line under the number
+// (c.c) for the blocks that have one.
+void buildCaptioned(Cell& c, const char* caption, bool withSubLine = false) {
+  c.b = label(c, M.fCaption);
   lv_label_set_text(c.b, caption);
-  c.a = label(c, M.fNum, cy + M.numDy);
-}
-
-// Like buildCaptioned, plus a small line under the number (c.c).
-void buildStat(Cell& c, const char* caption) {
-  buildCaptioned(c, caption);
-  c.c = label(c, M.fCaption, centreY(c) + M.subDy);
+  c.a = label(c, M.fNum);
+  if (withSubLine) c.c = label(c, M.fCaption);
+  layoutCaptioned(c);
 }
 
 void buildValue(Cell& c) {
-  bool tall = c.h >= M.tallH;
-  int mid = c.y + c.h / 2;
-  const lv_font_t* big = tall ? M.fBigL : M.fBigM;
-  c.a = label(c, big, 0);
-  lv_obj_set_y(c.a, mid + (tall ? M.digitsTall : M.digitsShort) - lineHeight(big) / 2);
-  c.b = label(c, M.fMid, 0);
-  lv_obj_set_y(c.b, mid + (tall ? M.unitTall : M.unitShort) - lineHeight(M.fMid) / 2);
+  c.a = label(c, c.h >= M.tallH ? M.fBigL : M.fBigM);
+  c.b = label(c, M.fMid);
+  layoutValue(c);
 }
 
 void buildArrow(Cell& c) {
   const int BOX = M.arrowBox;
   c.a = lv_obj_create(c.parent);
   lv_obj_set_size(c.a, BOX, BOX);
-  lv_obj_set_pos(c.a, c.x + (c.w - BOX) / 2, centreY(c) - BOX / 2);
+  lv_obj_set_pos(c.a, c.x + (c.w - BOX) / 2, c.y + (c.h - BOX) / 2);
   lv_obj_set_style_bg_opa(c.a, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(c.a, 0, 0);
   lv_obj_remove_flag(c.a, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_user_data(c.a, &c);
   lv_obj_add_event_cb(c.a, arrowDrawCb, LV_EVENT_DRAW_MAIN, nullptr);
-  c.b = uiLabel(c.parent, "?", M.fNum, c.x, centreY(c) - lineHeight(M.fNum) / 2, c.w);
+  c.b = label(c, M.fNum);  // "?" while the trend is unknown
+  lv_label_set_text(c.b, "?");
+  Ink k = inkOf(M.fNum, "?");
+  lv_obj_set_y(c.b, c.y + c.h / 2 - (k.top + k.bottom) / 2);
 }
 
 void buildClock(Cell& c) {
-  // Measured: the date + time ink is centred 13 px above the time label's centre.
-  int timeTop = centreY(c) + M.clockDy - lineHeight(M.fNumBig) / 2;
-  c.a = label(c, M.fNumBig, timeTop);
-  c.b = label(c, M.fMid, timeTop - lineHeight(M.fMid) + M.dateGap);
+  c.a = label(c, M.fNumBig);
+  c.b = label(c, M.fMid);
+  layoutClock(c);
 }
 
 // SEGMENTS stacked segments filling from the bottom, one per minute of age.
 void buildFresh(Cell& c) {
-  const int barH = c.h >= M.tallH ? M.barTall : M.barShort, segW = M.segW, GAP = M.segGap;
+  const int barH = std::min(c.h >= M.tallH ? M.barTall : M.barShort, c.h), segW = M.segW, GAP = M.segGap;
   const int segH = (barH - (SEGMENTS - 1) * GAP) / SEGMENTS;
-  int top = centreY(c) - barH / 2;
+  int top = c.y + (c.h - barH) / 2;
   for (int i = 0; i < SEGMENTS; i++) {  // seg[0] is the bottom one
     lv_obj_t* sg = lv_obj_create(c.parent);
     lv_obj_set_pos(sg, c.x + (c.w - segW) / 2, top + (SEGMENTS - 1 - i) * (segH + GAP));
@@ -190,7 +254,10 @@ void updateValue(Cell& c, const CellView& v) {
     lv_text_get_size(&size, buf, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
     if (size.x <= c.w - 8) break;
   }
-  if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) lv_obj_set_style_text_font(c.a, f, 0);
+  if (fontOf(c.a) != f) {
+    lv_obj_set_style_text_font(c.a, f, 0);
+    layoutValue(c);
+  }
   setText(c.a, buf);
   setText(c.b, v.mmol ? "mmol/L" : "mg/dL");
 }
@@ -273,7 +340,7 @@ void updateStat(Cell& c, const CellView& v) {
   }
   setText(c.b, caption.c_str());
   setNumber(c, number.c_str(), sub.length() == 0);
-  setText(c.c, sub.c_str());
+  if (c.c) setText(c.c, sub.c_str());
 }
 
 void updateHba1c(Cell& c, const CellView& v) {
@@ -296,12 +363,10 @@ void updateHba1c(Cell& c, const CellView& v) {
   }
   // the number is big; the "not available" text is a smaller, wrapping one
   const lv_font_t* f = h.ok ? M.fNum : M.fMid;
-  if (lv_obj_get_style_text_font(c.a, LV_PART_MAIN) != f) {
-    lv_obj_set_style_text_font(c.a, f, LV_PART_MAIN);
-    lv_obj_set_y(c.a, centreY(c) - (h.ok ? M.hbaNum : M.hbaNoData));
-  }
+  if (fontOf(c.a) != f) lv_obj_set_style_text_font(c.a, f, LV_PART_MAIN);
   setText(c.a, buf);
   setText(c.c, buf + 24);
+  layoutCaptioned(c);  // the text may wrap on two lines
 }
 
 }  // namespace
@@ -330,12 +395,12 @@ void cellBuild(Cell& c) {
     case CELL_READTIME: buildCaptioned(c, T("reading time")); break;
     case CELL_AGE: buildCaptioned(c, T("reading age")); break;
     case CELL_FRESH: buildFresh(c); break;
-    case CELL_AVG: buildStat(c, ""); break;
-    case CELL_TIR: buildStat(c, ""); break;
-    case CELL_RANGE: buildStat(c, ""); break;
-    case CELL_CV: buildStat(c, ""); break;
+    case CELL_AVG: buildCaptioned(c, ""); break;
+    case CELL_TIR: buildCaptioned(c, "", true); break;
+    case CELL_RANGE: buildCaptioned(c, ""); break;
+    case CELL_CV: buildCaptioned(c, "", true); break;
     case CELL_HBA1C:
-      buildStat(c, "");
+      buildCaptioned(c, "", true);
       lv_label_set_long_mode(c.a, LV_LABEL_LONG_WRAP);  // "Not available yet" may need two lines
       break;
     case CELL_GRAPH: c.a = graphCreate(c.parent, c.x, c.y, c.w, c.h); break;
