@@ -12,6 +12,7 @@
 #include "ui.h"
 #include "version.h"
 #include "lvgl_port.h"
+#include "battery.h"
 #include "power.h"
 #include "wifi_setup.h"
 #if POWER_SAVE
@@ -181,6 +182,7 @@ void setup() {
 }
 
 void loop() {
+  batteryTick();  // the first time, then every hour
   handleInput();
   nightTick();
   if (online) {

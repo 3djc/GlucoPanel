@@ -1,6 +1,9 @@
 #include "display.h"
 #include <Arduino.h>
+#include <algorithm>
+#include <cstring>
 #include "cells.h"
+#include "battery.h"
 #include "config.h"
 #include "i18n.h"
 #include "lvgl_port.h"
@@ -45,6 +48,63 @@ int colX(int w, int i) {
   return i == 0 ? 0 : i == 1 ? side : i == 2 ? side + M.centerW : w;
 }
 
+#ifndef UI_PROFILE_LCD
+// Battery level in the top right corner (e-paper only): an outline with a bar as long as the charge, and the percentage.
+struct BatteryIcon {
+  lv_obj_t *body = nullptr, *nub = nullptr, *bar = nullptr, *label = nullptr;
+  int barMaxW = 0;
+} bat;
+
+lv_obj_t* batteryRect(lv_obj_t* parent, int x, int y, int w, int h, int radius) {
+  lv_obj_t* o = lv_obj_create(parent);
+  lv_obj_set_pos(o, x, y);
+  lv_obj_set_size(o, w, h);
+  lv_obj_set_style_radius(o, radius, 0);
+  lv_obj_set_style_pad_all(o, 0, 0);
+  lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+  return o;
+}
+
+void buildBattery(lv_obj_t* scr) {
+  const int W = 32, H = 16, NUB_W = 3, NUB_H = 7, MARGIN = 8, PAD = 3, LABEL_W = 44;
+  int x = SCREEN_W - MARGIN - NUB_W - W, y = MARGIN;
+  lv_obj_t* body = bat.body = batteryRect(scr, x, y, W, H, 3);  // the outline
+  lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_color(body, lv_color_black(), 0);
+  lv_obj_set_style_border_width(body, 2, 0);
+  lv_obj_t* nub = bat.nub = batteryRect(scr, x + W, y + (H - NUB_H) / 2, NUB_W, NUB_H, 1);
+  lv_obj_set_style_bg_color(nub, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(nub, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(nub, 0, 0);
+  bat.barMaxW = W - 2 * PAD;
+  bat.bar = batteryRect(scr, x + PAD, y + PAD, bat.barMaxW, H - 2 * PAD, 1);
+  lv_obj_set_style_bg_color(bat.bar, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(bat.bar, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(bat.bar, 0, 0);
+  int lineH = lv_font_get_line_height(M.fCaption);
+  bat.label = uiLabel(scr, "", M.fCaption, x - 5 - LABEL_W, y + (H - lineH) / 2);
+  lv_obj_set_width(bat.label, LABEL_W);
+  lv_obj_set_style_text_align(bat.label, LV_TEXT_ALIGN_RIGHT, 0);
+}
+
+void updateBattery() {
+  int pct = batteryPercent();
+  lv_obj_t* parts[] = {bat.body, bat.nub, bat.bar, bat.label};
+  for (lv_obj_t* o : parts) {
+    if (pct < 0) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (pct < 0) return;
+  lv_obj_set_width(bat.bar, std::max(1, bat.barMaxW * pct / 100));
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%d%%", pct);
+  if (strcmp(buf, lv_label_get_text(bat.label))) lv_label_set_text(bat.label, buf);
+}
+#else
+void buildBattery(lv_obj_t*) {}
+void updateBattery() {}
+#endif
+
 // Everything that needs the screen to be rebuilt when it changes.
 String layoutSignature() {
   String sig = cfgGet("tz") + "|" + cfgGet("lang");
@@ -67,6 +127,7 @@ bool invertWanted(Mode m) { return night && (m == MODE_READING || m == MODE_NO_D
 
 void updateCells() {
   for (Cell& c : cells) cellUpdate(c, view);
+  updateBattery();
 }
 
 void buildReadingScreen() {
@@ -127,6 +188,7 @@ void buildReadingScreen() {
   lv_obj_set_style_max_width(errorLabel, SCREEN_W - 2 * M.edge, 0);
   lv_obj_set_style_bg_color(errorLabel, lv_color_white(), 0);
   lv_obj_set_style_bg_opa(errorLabel, LV_OPA_TRANSP, 0);
+  buildBattery(scr);  // last: on top of the blocks
 }
 
 }  // namespace
