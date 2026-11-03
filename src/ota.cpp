@@ -9,6 +9,7 @@
 #include <mbedtls/sha256.h>
 #include "config.h"
 #include "display.h"
+#include "tls_client.h"
 #include "version.h"
 
 #ifndef OTA_MANIFEST_URL
@@ -18,18 +19,16 @@
 
 static const unsigned long CONFIRM_AFTER_MS = 60000;  // a new firmware that has run this long is kept
 
-// The root certificate list embedded by the SDK (see http.cpp). Updates are always verified, whatever the
+// Updates are always checked against the root certificates embedded by the SDK (see tls_client.h), whatever the
 // "Check server certificates" setting says.
-extern const uint8_t rootca_start[] asm("_binary_x509_crt_bundle_start");
-extern const uint8_t rootca_end[] asm("_binary_x509_crt_bundle_end");
 
 // By default the Arduino core confirms the running firmware as soon as it boots. Say that we do it
 // ourselves (otaTick), so an update that cannot run properly is rolled back at the next restart.
 extern "C" bool verifyRollbackLater() { return true; }  // C linkage: it replaces a weak C function of the core
 
 // GitHub answers with a redirect to its download servers.
-static bool beginHttps(HTTPClient& http, WiFiClientSecure& tls, const String& url) {
-  tls.setCACertBundle(rootca_start, rootca_end - rootca_start);
+static bool beginHttps(HTTPClient& http, BundleClient& tls, const String& url) {
+  tls.useBundle();
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setTimeout(15000);
   http.setUserAgent("GlucoPanel/" FW_VERSION);
@@ -60,7 +59,7 @@ static OtaInfo fetchManifest() {
   if (time(nullptr) < 1700000000) { info.error = "Waiting for the clock (NTP)"; return info; }
 
   HTTPClient http;
-  WiFiClientSecure tls;
+  BundleClient tls;
   if (!beginHttps(http, tls, OTA_MANIFEST_URL)) { info.error = "bad URL"; return info; }
   int code = http.GET();
   if (code != 200) {
@@ -105,7 +104,7 @@ static bool fail(String& error, const String& why) {
 
 static bool install(const OtaInfo& info, String& error) {
   HTTPClient http;
-  WiFiClientSecure tls;
+  BundleClient tls;
   if (!beginHttps(http, tls, info.url)) { error = "bad URL"; return false; }
   int code = http.GET();
   if (code != 200) {

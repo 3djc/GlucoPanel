@@ -4,24 +4,23 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "config.h"
+#include "tls_client.h"
 
-// The SDK embeds the Mozilla root certificate list (~68 KB, already part of the firmware); HTTPS
-// connections are checked against it unless "Check server certificates" is switched off in the settings.
-extern const uint8_t rootca_start[] asm("_binary_x509_crt_bundle_start");
-extern const uint8_t rootca_end[] asm("_binary_x509_crt_bundle_end");
+// HTTPS connections are checked against the root certificates embedded in the SDK (see tls_client.h) unless
+// "Check server certificates" is switched off in the settings.
 
 HttpResponse httpRequest(const char* method, const String& url, const String& body,
                          const std::vector<HttpHeader>& headers) {
   HttpResponse r;
   HTTPClient http;
-  WiFiClientSecure tls;
+  BundleClient tls;
   WiFiClient plain;
   bool ok;
   bool secure = url.startsWith("https://");
   if (secure) {
     // Needs the clock to be right (certificates have validity dates): fetchGlucose() waits for NTP first.
     if (cfgGet("tls_verify") == "off") tls.setInsecure();
-    else tls.setCACertBundle(rootca_start, rootca_end - rootca_start);
+    else tls.useBundle();
     ok = http.begin(tls, url);
   } else {
     ok = http.begin(plain, url);
