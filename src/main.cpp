@@ -73,6 +73,17 @@ static Deltas deltas;
 static String lastError;
 
 static void refresh() {
+  // Right after boot the clock needs a few seconds (NTP). Retry quickly instead of drawing an error and waiting a
+  // minute; if it still is not set after 30 s, fall through so the error shows.
+  static unsigned long clockWaitSince = 0;
+  if (time(nullptr) < 1700000000) {
+    if (!clockWaitSince) clockWaitSince = millis();
+    if (millis() - clockWaitSince < 30000UL) {
+      nextFetch = millis() + 500;
+      return;
+    }
+  }
+
   FetchResult r = fetchGlucose();
   if (r.ok) {
     lastGood = r.reading;
