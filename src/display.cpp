@@ -66,8 +66,12 @@ void buildReadingScreen() {
   lv_obj_t* band = lv_obj_create(scr);
   lv_obj_set_pos(band, M.bandX, M.bandY);
   lv_obj_set_size(band, M.bandW, M.bandH);
+#ifdef UI_PROFILE_LCD
   lv_obj_set_style_bg_color(band, UI_GREY, 0);
   lv_obj_set_style_bg_opa(band, LV_OPA_COVER, 0);
+#else
+  lv_obj_set_style_bg_opa(band, LV_OPA_TRANSP, 0);  // e-paper: no grey fill, just the separators
+#endif
   lv_obj_set_style_radius(band, M.bandRadius, 0);
   lv_obj_set_style_border_width(band, 0, 0);
   lv_obj_set_style_pad_all(band, 0, 0);
