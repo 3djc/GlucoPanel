@@ -106,7 +106,78 @@ void portRefresh(bool forceFull) {
 
 #define BLACK_BELOW 128  // luminance (0..255) under which a pixel is drawn black
 
-static EPaper epaper;
+#ifdef ARDUINO
+// Seeed_GFX's updataPartial() only sends the NEW image of the window to the UC8179. The controller drives the pixels
+// from the difference between its old and new images, and the old one was never updated, so the previous digits
+// ghosted through. This class keeps a copy of what is on the glass and sends both images for the window.
+class Panel : public EPaper {
+ public:
+  // Call after every full refresh: the glass now shows exactly the frame buffer.
+  void rememberAll() {
+    size_t n = (size_t)_width * _height / 8;
+    if (!prev) prev = (uint8_t*)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!prev) prev = (uint8_t*)malloc(n);
+    prevValid = prev != nullptr;
+    if (prevValid) memcpy(prev, _img8, n);
+  }
+
+  // Partial refresh of a window (screen coordinates, no rotation or mirroring on the E1001).
+  // Returns false when it cannot be done (nothing remembered yet, out of memory): do a full refresh then.
+  bool refreshWindow(int x, int y, int w, int h) {
+    if (!prevValid) return false;
+    int bw = w, bh = h;
+    if (x < 0) { bw += x; x = 0; }
+    if (y < 0) { bh += y; y = 0; }
+    if (x + bw > _width) bw = _width - x;
+    if (y + bh > _height) bh = _height - y;
+    if (bw < 1 || bh < 1) return true;
+
+    uint16_t x0 = x & ~7, x1 = (x + bw + 7) & ~7;  // the controller works on whole bytes
+    uint16_t wA = x1 - x0, wb = wA >> 3, stride = _width >> 3, yy = y, hh = bh;
+    size_t n = (size_t)wb * hh;
+    uint8_t* nw = (uint8_t*)malloc(n);
+    uint8_t* od = (uint8_t*)malloc(n);
+    if (!nw || !od) {
+      free(nw);
+      free(od);
+      return false;
+    }
+    for (uint16_t row = 0; row < hh; row++) {
+      memcpy(nw + row * wb, _img8 + (size_t)(yy + row) * stride + (x0 >> 3), wb);
+      memcpy(od + row * wb, prev + (size_t)(yy + row) * stride + (x0 >> 3), wb);
+    }
+
+    uint16_t xEnd = x0 + wA - 1, yEnd = yy + hh - 1;
+    EPD_WAKEUP_PARTIAL();
+    EPD_SET_WINDOW(x0, yy, xEnd, yEnd);
+    EPD_PUSH_OLD_COLORS(wA, hh, od);
+    EPD_PUSH_NEW_COLORS(wA, hh, nw);
+    EPD_UPDATE_PARTIAL();
+    EPD_SLEEP();  // the base class keeps believing the panel sleeps: it is back asleep when we return
+
+    for (uint16_t row = 0; row < hh; row++) memcpy(prev + (size_t)(yy + row) * stride + (x0 >> 3), nw + row * wb, wb);
+    free(nw);
+    free(od);
+    return true;
+  }
+
+ private:
+  uint8_t* prev = nullptr;  // what the glass shows
+  bool prevValid = false;
+};
+#else
+// Simulator: its stand-in panel already does partial refreshes.
+class Panel : public EPaper {
+ public:
+  void rememberAll() {}
+  bool refreshWindow(int x, int y, int w, int h) {
+    updataPartial(x, y, w, h);
+    return true;
+  }
+};
+#endif
+
+static Panel epaper;
 static unsigned long lastFullMs = 0;
 
 static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
@@ -147,11 +218,12 @@ void portRefresh(bool forceFull) {
   lv_refr_now(display);  // render synchronously: the flush callback fills the panel framebuffer
   if (!forceFull && !hasDirty) return;
 
-  if (forceFull || millis() - lastFullMs >= FULL_REFRESH_MS) {
+  bool full = forceFull || millis() - lastFullMs >= FULL_REFRESH_MS;
+  if (!full && !epaper.refreshWindow(dirty.x1, dirty.y1, dirty.x2 - dirty.x1 + 1, dirty.y2 - dirty.y1 + 1)) full = true;
+  if (full) {
     epaper.update();
+    epaper.rememberAll();
     lastFullMs = millis();
-  } else {
-    epaper.updataPartial(dirty.x1, dirty.y1, dirty.x2 - dirty.x1 + 1, dirty.y2 - dirty.y1 + 1);
   }
 }
 
