@@ -88,7 +88,7 @@ void buildBattery(lv_obj_t* scr) {
 }
 
 void updateBattery() {
-  int pct = batteryPercent();
+  int pct = batteryUsbPowered() ? -1 : batteryPercent();  // no icon while the USB is plugged in
   lv_obj_t* parts[] = {bat.body, bat.nub, bat.bar, bat.label};
   for (lv_obj_t* o : parts) {
     if (pct < 0) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);

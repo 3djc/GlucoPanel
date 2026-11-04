@@ -14,6 +14,7 @@ const unsigned long PERIOD_HOURS = 1;  // 1 hour while the E1001 is being tested
 const unsigned long PERIOD_MS = PERIOD_HOURS * 3600UL * 1000UL;
 const int BATTERY_ADC_PIN = 1;      // GPIO1: the battery voltage through a divider by 2
 const int BATTERY_ENABLE_PIN = 21;  // GPIO21 high switches the divider on (it leaks when left on)
+const int USB_BRIDGE_PIN = 44;      // UART0 RX: the USB-serial bridge's TX
 
 bool haveReading = false;
 unsigned long lastRead = 0;
@@ -75,3 +76,13 @@ void batteryTick() {
 int batteryPercent() { return percent; }
 
 float batteryVolts() { return volts; }
+
+bool batteryUsbPowered() {
+#if BATTERY_MONITOR
+  pinMode(USB_BRIDGE_PIN, INPUT_PULLDOWN);  // left like this, it also keeps the line from floating while asleep
+  delayMicroseconds(200);                   // the line settles
+  return digitalRead(USB_BRIDGE_PIN) == HIGH;
+#else
+  return getenv("SIM_USB") != nullptr;
+#endif
+}

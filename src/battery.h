@@ -12,3 +12,8 @@ int batteryPercent();
 
 // The last battery voltage in volts (0 when unknown).
 float batteryVolts();
+
+// True while the USB cable is plugged in, so the battery level means little. On the E1001 the USB-serial bridge
+// is powered by the USB: its TX output, wired to GPIO44, idles high when plugged and is not driven otherwise (a
+// pull-down on GPIO44 makes that a clean 0). The simulator says "plugged" when SIM_USB is set.
+bool batteryUsbPowered();
