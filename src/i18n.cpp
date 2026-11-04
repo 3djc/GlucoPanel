@@ -176,6 +176,7 @@ const Entry TABLE[] = {
     {"Lowest and highest", {"Minimum et maximum", "Niedrigster und höchster Wert", "Minimo e massimo", "Mínimo y máximo"}},
     {"Variability (CV)", {"Variabilité (CV)", "Variabilität (CV)", "Variabilità (CV)", "Variabilidad (CV)"}},
     {"Glucose graph (3 h)", {"Courbe de glycémie (3 h)", "Glukosekurve (3 Std.)", "Grafico glicemico (3 h)", "Gráfico de glucosa (3 h)"}},
+    {"Time and glucose graph", {"Heure et courbe de glycémie", "Uhrzeit und Glukosekurve", "Ora e grafico glicemico", "Hora y gráfico de glucosa"}},
     // ---- web page: texts ----
     {"Saved.", {"Enregistré.", "Gespeichert.", "Salvato.", "Guardado."}},
     {"Save", {"Enregistrer", "Speichern", "Salva", "Guardar"}},

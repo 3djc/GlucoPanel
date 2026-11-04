@@ -20,8 +20,9 @@ enum Mode { MODE_NONE, MODE_NOT_CONFIGURED, MODE_NO_DATA, MODE_READING };
 // Top band (like Gluco-Monitor's): three cells, on a light grey card on the LCD. All sizes come from the profile (profile.cpp).
 
 // The blocks, in the order of their settings: top row, middle row, bottom row.
-const int N_CELLS = 7;
-const char* const CELL_KEYS[N_CELLS] = {"blk_tl", "blk_tm", "blk_tr", "blk_ml", "blk_mc", "blk_mr", "blk_bottom"};
+const int N_KEYS = 7;   // the blocks of the settings
+const int N_CELLS = 8;  // plus the clock that "Time and glucose graph" puts left of the graph in the bottom row
+const char* const CELL_KEYS[N_KEYS] = {"blk_tl", "blk_tm", "blk_tr", "blk_ml", "blk_mc", "blk_mr", "blk_bottom"};
 Cell cells[N_CELLS];  // their addresses must stay put (the arrow's draw callback points at one)
 lv_obj_t* errorLabel = nullptr;
 
@@ -108,7 +109,7 @@ void updateBattery() {}
 // Everything that needs the screen to be rebuilt when it changes.
 String layoutSignature() {
   String sig = cfgGet("tz") + "|" + cfgGet("lang");
-  for (int i = 0; i < N_CELLS; i++) sig += "|" + cfgGet(CELL_KEYS[i]);
+  for (int i = 0; i < N_KEYS; i++) sig += "|" + cfgGet(CELL_KEYS[i]);
   return sig;
 }
 
@@ -157,7 +158,9 @@ void buildReadingScreen() {
     lv_obj_set_style_radius(sep, 0, 0);
   }
 
-  for (int i = 0; i < N_CELLS; i++) {
+  bool split = cfgGet("blk_bottom") == "timegraph";  // bottom row: the clock on the left, the graph on the right
+  int splitX = colX(SCREEN_W, 1);                    // the clock is as wide as the first column above it
+  for (int i = 0; i < N_KEYS; i++) {
     Cell& c = cells[i];
     c = Cell();
     c.type = cellTypeFromString(cfgGet(CELL_KEYS[i]));
@@ -174,13 +177,25 @@ void buildReadingScreen() {
       c.y = M.midY;
       c.h = M.midH;
     } else {  // bottom row
+      if (split) c.type = CELL_GRAPH;
       c.parent = scr;
-      c.x = 0;
+      c.x = split ? splitX : 0;
       c.y = M.graphY;
-      c.w = SCREEN_W;
+      c.w = SCREEN_W - c.x;
       c.h = M.graphH;
     }
     cellBuild(c);
+  }
+  Cell& clock = cells[N_KEYS];
+  clock = Cell();
+  if (split) {
+    clock.type = CELL_CLOCK;
+    clock.parent = scr;
+    clock.x = 0;
+    clock.y = M.graphY;
+    clock.w = splitX;
+    clock.h = M.graphH;
+    cellBuild(clock);
   }
 
   errorLabel = uiLabel(scr, "", M.fCaption, M.edge, M.stripY);  // as wide as its text, up to the screen width

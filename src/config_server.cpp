@@ -202,6 +202,7 @@ static const char* EDITOR_CSS = R"HTML(
 .fr{display:flex;flex-direction:column-reverse;gap:2cqw;width:37cqw}
 .fr u{display:block;height:6.5cqw;border:1cqw solid #000;border-radius:2cqw;text-decoration:none}.fr u.f{background:#000}
 .gr{width:100%;height:100%}
+.tg{display:flex;width:100%;height:100%}.tg>div{container-type:inline-size;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%}.tgc{width:30%}.tgg{width:70%}
 )HTML";
 
 static const char* EDITOR_JS = R"HTML(
@@ -230,6 +231,7 @@ function pv(t){
  case 'cv':return '<i class=cap>'+L.var+' 16 h</i><b class=num>28%</b><i class=cap>'+L.sd+' '+(mm?'2.1':'38')+'</i>';
  case 'hba1c':return '<i class=cap>'+L.hba+'</i><b class=num>'+(PCT?'6.4%':'46 mmol/mol')+'</b><i class=cap>'+L.over.replace('%d',14)+'</i>';
  case 'graph':return '<svg class=gr viewBox="0 0 200 60" preserveAspectRatio="none"><rect x="14" y="20" width="182" height="22" fill="#ddd"/><path d="M14 8V54H196" fill="none" stroke="#000" stroke-width="1.5"/><path d="M14 20H196M14 42H196" stroke="#000" stroke-width=".6" stroke-dasharray="3 3"/><path d="M16 46C40 50 60 40 85 34S130 14 150 22 180 34 190 30" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="190" cy="30" r="3.4"/></svg>';
+ case 'timegraph':return '<div class=tg><div class=tgc>'+pv('clock')+'</div><div class=tgg>'+pv('graph')+'</div></div>';
  default:return '<span class=none>'+L.empty+'</span>';}
 }
 const names=sel.map(s=>s.previousElementSibling.textContent);

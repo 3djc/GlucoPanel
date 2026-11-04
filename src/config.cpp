@@ -53,7 +53,7 @@ const ConfigField CONFIG_FIELDS[] = {
   {"blk_ml", "Middle row, left", "select", "", BLOCK_OPTIONS, "clock"},
   {"blk_mc", "Middle row, centre", "select", "", BLOCK_OPTIONS, "value"},
   {"blk_mr", "Middle row, right", "select", "", BLOCK_OPTIONS, "fresh"},
-  {"blk_bottom", "Bottom row", "select", "", "graph:Glucose graph (3 h)|none:Empty", "graph"},
+  {"blk_bottom", "Bottom row", "select", "", "graph:Glucose graph (3 h)|timegraph:Time and glucose graph|none:Empty", "graph"},
 };
 const int CONFIG_FIELD_COUNT = sizeof(CONFIG_FIELDS) / sizeof(CONFIG_FIELDS[0]);
 
