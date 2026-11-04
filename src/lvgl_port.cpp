@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include <stdlib.h>
+#include <time.h>
 #include "profile.h"
 #include "ui.h"
 #ifdef UI_PROFILE_LCD
@@ -91,10 +92,11 @@ void portRefresh(bool forceFull) {
 // e-paper (reTerminal E1001)
 // ---------------------------------------------------------------------------------------------------
 // ePaper policy: a full refresh flashes and wears the panel, so it is only used when the screen
-// layout changes and every FULL_REFRESH_MS to clear ghosting. Everything else (new reading, age
-// text, error text) is a single partial refresh of the smallest window covering what changed.
-#ifndef FULL_REFRESH_MS
-#define FULL_REFRESH_MS (30UL * 60UL * 1000UL)
+// layout changes and once a day, at the first redraw after FULL_REFRESH_HOUR (local time), to clear
+// ghosting. Everything else (new reading, age text, error text) is a single partial refresh of the
+// smallest window covering what changed.
+#ifndef FULL_REFRESH_HOUR
+#define FULL_REFRESH_HOUR 3
 #endif
 
 // The E1001's real 4-level gray mode has no partial refresh, so UI_GREY fills are drawn as a sparse
@@ -183,7 +185,16 @@ class Panel : public EPaper {
 #endif
 
 static Panel epaper;
-static unsigned long lastFullMs = 0;
+// The number of the "refresh day": it changes once a day, at FULL_REFRESH_HOUR local time. -1 until the clock is set.
+static long refreshDay() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return -1;
+  uiApplyTimeZone();
+  struct tm t;
+  localtime_r(&now, &t);
+  return t.tm_year * 366L + t.tm_yday - (t.tm_hour < FULL_REFRESH_HOUR ? 1 : 0);
+}
+static long lastFullDay = -1;  // the refresh day of the last full refresh
 
 static void flushCb(lv_display_t* disp, const lv_area_t* area, uint8_t* px) {
   static const uint8_t bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -223,12 +234,13 @@ void portRefresh(bool forceFull) {
   lv_refr_now(display);  // render synchronously: the flush callback fills the panel framebuffer
   if (!forceFull && !hasDirty) return;
 
-  bool full = forceFull || millis() - lastFullMs >= FULL_REFRESH_MS;
+  long day = refreshDay();
+  bool full = forceFull || (day != -1 && day != lastFullDay);  // the first redraw after 3:00 is a full one
   if (!full && !epaper.refreshWindow(dirty.x1, dirty.y1, dirty.x2 - dirty.x1 + 1, dirty.y2 - dirty.y1 + 1)) full = true;
   if (full) {
     epaper.update();
     epaper.rememberAll();
-    lastFullMs = millis();
+    lastFullDay = day;
   }
 }
 

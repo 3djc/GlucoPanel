@@ -128,7 +128,7 @@ tools/
 
 Full refreshes flash and wear the panel, so `src/lvgl_port.cpp` and `src/display.cpp` avoid them:
 
-- **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and every 30 minutes to clear ghosting (`FULL_REFRESH_MS`).
+- **Full refresh** only when the screen layout changes (not configured / no data / reading, or the source or unit changes) and once a day, at the first redraw after 3:00 local time, to clear ghosting (`FULL_REFRESH_HOUR`).
 - **Partial refresh** of one window covering just the blocks that changed (arrow, deltas, value), the "Updated N min ago" strip once a minute, and the error text.
 - **No refresh** when a fetch changes nothing, e.g. repeated identical errors.
 
